@@ -540,7 +540,8 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 	$code = substr_replace($file, '', strpos($file, '.'));
 	$added = 0;
 	// Find matching product / matrix entries
-	if (!$stmts['find_products']->bind_param('issss', $file_id, $code, $code, $code, $code) || !$stmts['find_products']->execute()) {
+	if ((empty($options['regexp']) && (!$stmts['find_products']->bind_param('issss', $file_id, $code, $code, $code, $code) || !$stmts['find_products']->execute())) ||
+		(!empty($options['regexp']) && (!$stmts['find_products']->bind_param('isss', $file_id, $code, $code, $code) || !$stmts['find_products']->execute()))) {
 		$message .= "<br>ERROR: Database error selecting matching products for $code: $stmts[find_products]->errno - $stmts[find_products]->error";
 		return false;
 	}
@@ -706,7 +707,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 	$stmts['update_matrix_img'] = $dbc->prepare($q);
 	
 	// prepared statement to check for products and matrix entries with codes matching the filename
-	// params = 'issss', file_id, filename x 4
+	// params = 'issss', file_id, filename x 4 (x 3 if custom regexp supplied)
 	$q = "SELECT 
 			product.product_id,
 			product.product_code,
@@ -731,10 +732,9 @@ function getPreparedStatements($dbc, array $options = array()) {
 				OR (
 					# ??? Only perform matching if there is not an exact match for this code
 					matrix.matrix_id IS NULL AND 
-						(
-						? REGEXP " . (empty($options['regexp']) 
-								? "CONCAT('^(', product.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')" 
-								: "'{$dbc->escape_string($options['regexp'])}'"
+						(" . (empty($options['regexp']) 
+								? "? REGEXP CONCAT('^(', product.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')" 
+								: "product.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'"
 							) . "
 						#OR ? REGEXP CONCAT('^(', product.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')
 						)
