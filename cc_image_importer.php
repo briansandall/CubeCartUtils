@@ -716,17 +716,17 @@ function getPreparedStatements($dbc, array $options = array()) {
 			matrix.product_code AS matrix_product_code,
 			matrix_img.file_id AS matrix_image_file_id,
 			IF(filemanager.filepath IS NULL, filemanager.filename, CONCAT(filemanager.filepath, filemanager.filename)) AS matrix_image_file 
-		FROM `$prefix" . "_inventory product` 
-		LEFT JOIN `$prefix" . "_image_index img` ON img.product_id=product.product_id AND img.file_id=? 
-		LEFT JOIN `$prefix" . "_option_matrix matrix` ON matrix.product_id=product.product_id 
+		FROM `$prefix" . "_inventory` product 
+		LEFT JOIN `$prefix" . "_image_index` img ON img.product_id=product.product_id AND img.file_id=? 
+		LEFT JOIN `$prefix" . "_option_matrix` matrix ON matrix.product_id=product.product_id 
 			AND (
 				# match product code: exact, code-var1, or user-defined regexp e.g. codeY(S|M|L)
 				matrix.product_code=? OR 
 				? REGEXP CONCAT('^(', matrix.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')
 				 " . (empty($options['regexp']) ? '' : " OR matrix.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'") . "
 			)
-		LEFT JOIN `$prefix" . "_image_index matrix_img` ON matrix_img.id=matrix.image 
-		LEFT JOIN `$prefix" . "_filemanager filemanager` ON filemanager.file_id=matrix_img.file_id 
+		LEFT JOIN `$prefix" . "_image_index` matrix_img ON matrix_img.id=matrix.image 
+		LEFT JOIN `$prefix" . "_filemanager` filemanager ON filemanager.file_id=matrix_img.file_id 
 		WHERE matrix.matrix_id IS NOT NULL OR 
 			((product.product_code=? 
 				OR (
