@@ -1,0 +1,9 @@
+# Disable directory browsing:
+Options All -Indexes
+# Prevent folder listing:
+IndexIgnore *
+# Prevent access to any file:
+Order Deny,Allow
+Deny From All
+# Grant access to a specific IP:
+Allow From 0.0.0.0
