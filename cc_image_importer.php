@@ -696,7 +696,7 @@ function formatName($name) {
  * @param $options uses the 'update_size', 'code_suffix', and 'regexp' values
  */
 function getPreparedStatements($dbc, array $options = array()) {
-	$prefix = (empty(TABLE_PREFIX) ? '' : TABLE_PREFIX) . 'cubecart';
+	$prefix = (empty(TABLE_PREFIX) ? '' : TABLE_PREFIX) . 'CubeCart';
 	$stmts = array();
 	
 	// prepared statement to check if image file already exists
