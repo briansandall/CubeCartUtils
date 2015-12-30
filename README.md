@@ -5,6 +5,8 @@ Current scripts include:
 
 - Image Importer: Quickly and easily import pre-uploaded images into CubeCart's database and automatically associate them with products.
 
+- Price Updater: Update prices for your entire store in 5 minutes or less
+
 DISCLAIMER
 
 Each script is provided  "as is" without warranty of any kind, either express or implied,
