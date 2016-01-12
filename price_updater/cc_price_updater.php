@@ -259,7 +259,7 @@ $directories = getDirectories(PATH, true);
 			<label for="update_main_price" class="fleft">Update pricing for the main product using the lowest non-zero priced (base, not sale) matrix option</label>
 			<div class="clear"></div>
 			<small class="inner alert">Note that this requires your CubeCart installation to support both a 'price' and a 'sale_price' for the `option_matrix` table.</small>
-			<small class="inner">Note that pricing will only update if at least one of the product's prices (main product or matrix) changed.</small>
+			<br><small class="inner">Note that pricing will only update if at least one of the product's prices (main product or matrix) changed.</small>
 			<br><small class="inner">Useful if there is no 'general' price for the product, i.e. pricing is determined entirely by the chosen options / matrix.</small>
 			<br><br>
 			<input type="checkbox" id="disable_products" name="disable_products"<?php echo (!empty($options['disable_products']) ? ' checked="checked"' : ''); ?><?php echo (MATRIX_STATUS_ON ? '' : ' disabled="disabled"'); ?> />
