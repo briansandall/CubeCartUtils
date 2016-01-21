@@ -668,9 +668,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					if (!$stmts['update_main_price']->bind_param('ddi', $price, $sale_price, $product_id) || !$stmts['update_main_price']->execute()) {
 						throw new \RuntimeException("Failed to update main prices for product $product_id: {$stmts['update_main_price']->errno} - {$stmts['update_main_price']->error}");
 					} elseif ($stmts['update_main_price']->affected_rows > 0) {
-						$result['updated'][] = "Main prices for product id $product_id set to lowest found in matrix: List Price=\$$price, Sale Price=\$$sale_price";
+						$result['updated'][] = "Main prices for product id $product_id set to lowest found in matrix: List Price=\$$price, Sale Price=\$".($sale_price ? $sale_price : '0.00');
 					} else {
-						$result['warning'][] = "Failed to update prices to \$$price (sale: \$$sale_price) for product $product_id: prices may already be up-to-date";
+						$result['warning'][$product_id][] = "Failed to update prices to \$$price (sale: \$".($sale_price ? $sale_price : '0.00').") - prices may already be up-to-date";
 					}
 				}
 			}
