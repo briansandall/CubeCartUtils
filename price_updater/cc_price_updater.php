@@ -100,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				'sale_price'   => array('label'=>$header_labels['sale_price'], 'required'=>true),
 				'manufacturer' => array('label'=>$header_labels['manufacturer'], 'required'=>false),
 			),
+		/** allow 'sale' prices to be greater than the list price */
+		'allow_upsell'          => isset($_POST['allow_upsell']),
 		/** sets status of products / matrix entries that have a price update to enabled */
 		'enable_updated'        => isset($_POST['enable_updated']),
 		/** true to update prices in the option matrix - only select if your database supports this! */
@@ -252,7 +254,11 @@ $directories = getDirectories(PATH, true);
 			<p>Other Options</p>
 			<input type="checkbox" id="enable_updated" name="enable_updated"<?php echo (!empty($options['enable_updated']) ? ' checked="checked"' : ''); ?> />
 			<label for="enable_updated" class="fleft">Automatically enable products (and matrix entries, if applicable) whose prices are updated</label>
+			<div class="clear"></div><br>
+			<input type="checkbox" id="allow_upsell" name="allow_upsell"<?php echo (!empty($options['allow_upsell']) ? ' checked="checked"' : ''); ?> />
+			<label for="allow_upsell" class="fleft">Allow 'sale' prices to be greater than the list price*</label>
 			<div class="clear"></div>
+			<small>* If such is the case, the 'sale' price will be used as the list price, and the item will not be considered 'on sale'</small>
 			<h4>MATRIX OPTIONS</h4>
 			<?php echo (MATRIX_STATUS_ON ? '' : '<p>You must enable MATRIX_STATUS_ON in the script file in order to use any of the <strong>Matrix Options</strong>.</p>'); ?>
 			<?php echo (empty($errors['matrix_options']) ? '' : '<p><span class="error">ERROR: ' . $errors['matrix_options'] . '</span></p>'); ?>
@@ -554,6 +560,10 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				$list_price = round_up($entry[$labels['list_price']['label']], 2);
 				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up($entry[$labels['cost_price']['label']], 2) : null);
 				$sale_price = round_up($entry[$labels['sale_price']['label']], 2);
+				if ($sale_price > $list_price && $options['allow_upsell']) {
+					$list_price = $sale_price;
+					$sale_price = null;
+				}
 				if ($select_only) {
 					if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
@@ -658,7 +668,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					if (!$stmts['update_main_price']->bind_param('ddi', $price, $sale_price, $product_id) || !$stmts['update_main_price']->execute()) {
 						throw new \RuntimeException("Failed to update main prices for product $product_id: {$stmts['update_main_price']->errno} - {$stmts['update_main_price']->error}");
 					} elseif ($stmts['update_main_price']->affected_rows > 0) {
-						$result['updated'][] = "Main prices updated for product $product_id: List Price=\$$price, Sale Price=\$$sale_price";
+						$result['updated'][] = "Main prices for product id $product_id set to lowest found in matrix: List Price=\$$price, Sale Price=\$$sale_price";
 					} else {
 						$result['warning'][] = "Failed to update prices to \$$price (sale: \$$sale_price) for product $product_id: prices may already be up-to-date";
 					}
