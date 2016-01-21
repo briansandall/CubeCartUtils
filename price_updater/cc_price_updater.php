@@ -558,8 +558,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
 						} elseif (empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
-							$desc = (array_key_exists($product_code, $result['not_found']) ? 'Neither product nor matrix' : 'Matrix');
-							$result['not_found'][$product_code] = "$desc entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							if (array_key_exists($product_code, $result['not_found'])) {
+								$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							}
 						} else {
 							$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 							$updated[$product_id][] = $product_code;
@@ -581,8 +582,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						if (!$stmts['update_matrix']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
 						} elseif ($stmts['update_matrix']->affected_rows < 1) {
-							$desc = (array_key_exists($product_code, $result['not_found']) ? 'Neither product nor matrix' : 'Matrix');
-							$result['not_found'][$product_code] = "$desc entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							if (array_key_exists($product_code, $result['not_found'])) {
+								$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							}
 						} else {
 							if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 								throw new \RuntimeException("Query to select product id from matrix table failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
