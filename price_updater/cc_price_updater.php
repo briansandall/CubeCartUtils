@@ -96,6 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'header_labels'      => array(
 				'product_code' => array('label'=>$header_labels['product_code'], 'required'=>true),
 				'list_price'   => array('label'=>$header_labels['list_price'], 'required'=>true),
+				'cost_price'   => array('label'=>$header_labels['cost_price'], 'required'=>false),
 				'sale_price'   => array('label'=>$header_labels['sale_price'], 'required'=>true),
 				'manufacturer' => array('label'=>$header_labels['manufacturer'], 'required'=>false),
 			),
@@ -238,6 +239,12 @@ $directories = getDirectories(PATH, true);
 				<input type="text" id="header_list_price" name="header_labels[list_price]"<?php echo (empty($errors['header_labels']['list_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['list_price']) ? htmlspecialchars($header_labels['list_price']) . '"' : 'List Price'); ?>" required="required" title="List price for the product" />
 				<?php echo (empty($errors['header_labels']['list_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['list_price'] . '</span>'); ?>
 			</div><div class="fleft half">
+				<label for="header_cost_price" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price"><strong>Sale Price Header Label</strong></label><br>
+				<input type="text" id="header_cost_price" name="header_labels[cost_price]"<?php echo (empty($errors['header_labels']['cost_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['cost_price']) ? htmlspecialchars($header_labels['cost_price']) . '"' : 'Cost'); ?>" title="Price at which your company can procure the product" />
+				<?php echo (empty($errors['header_labels']['cost_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['cost_price'] . '</span>'); ?>
+			</div><div class="clear"></div>
+			<br>
+			<div class="fleft half">
 				<label for="header_sale_price" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price"><strong>Sale Price Header Label</strong></label><br>
 				<input type="text" id="header_sale_price" name="header_labels[sale_price]"<?php echo (empty($errors['header_labels']['sale_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['sale_price']) ? htmlspecialchars($header_labels['sale_price']) . '"' : 'Price'); ?>" required="required" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price" />
 				<?php echo (empty($errors['header_labels']['sale_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['sale_price'] . '</span>'); ?>
@@ -545,6 +552,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				$manufacturer = (empty($entry[$labels['manufacturer']['label']]) ? $options['manufacturer'] : $entry[$labels['manufacturer']['label']]);
 				$product_code = $entry[$labels['product_code']['label']];
 				$list_price = round_up($entry[$labels['list_price']['label']], 2);
+				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up($entry[$labels['cost_price']['label']], 2) : null);
 				$sale_price = round_up($entry[$labels['sale_price']['label']], 2);
 				if ($select_only) {
 					if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
@@ -552,7 +560,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					} elseif (empty(fetch_assoc_stmt($stmts['select_product']))) {
 						$result['not_found'][$product_code] = "Product not found in database; Manufacturer: $manufacturer | Product Code: $product_code";
 					} else {
-						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
@@ -571,12 +579,12 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						}
 					}
 				} else {
-					if (!$stmts['update_product']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
+					if (!$stmts['update_product']->bind_param('dddss', $list_price, $cost_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
 					} elseif ($stmts['update_product']->affected_rows < 1) {
 						$result['not_found'][$product_code] = "Product not found; Manufacturer: $manufacturer | Product Code: $product_code";
 					} else {
-						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['update_matrix']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
@@ -738,8 +746,8 @@ function getPreparedStatements($dbc, array $options = array()) {
 		$stmts['select_product'] = $dbc->prepare($q);
 	} else {
 		// update prices for matching products
-		// params = 'ddss', price, sale price, product code, manufacturer
-		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.sale_price=?, i.updated=CURRENT_TIMESTAMP WHERE i.product_code=? AND mf.name=?";
+		// params = 'dddss', price, cost_price, sale price, product code, manufacturer
+		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=?, i.updated=CURRENT_TIMESTAMP WHERE i.product_code=? AND mf.name=?";
 		$stmts['update_product'] = $dbc->prepare($q);
 		
 		// update prices for matching option matrix entries
