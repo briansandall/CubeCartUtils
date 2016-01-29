@@ -590,10 +590,10 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 			$message .= "<br>NOTICE: File id $file_id is already associated with product $match[product_id] - $match[product_code]; image_index id = $rel_id";
 		}
 		// Update matrix image entries if applicable
-		if (is_int($rel_id) && $update_matrix && !empty($match['matrix_id'])) {
+		if ($update_matrix && !empty($match['matrix_id'])) {
 			if (!empty($match['matrix_image_file_id']) && empty($options['force_update'])) {
 				$message .= "<br>WARNING: Matrix entry $match[matrix_id] - $match[matrix_product_code] is already associated with file $match[matrix_image_file_id] - $match[matrix_image_file]";
-			} elseif (empty($options['dry_run']) && (!$stmts['update_matrix_img']->bind_param('ii', $rel_id, $match['matrix_id']) || !$stmts['update_matrix_img']->execute())) {
+			} elseif (empty($options['dry_run']) && (!$stmts['update_matrix_img']->bind_param('ii', $file_id, $match['matrix_id']) || !$stmts['update_matrix_img']->execute())) {
 				$message .= "<br>ERROR: Database error updating matrix image id: $stmts[update_matrix_img]->errno - $stmts[update_matrix_img]->error";
 				return false;
 			} else {
