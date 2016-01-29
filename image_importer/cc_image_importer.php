@@ -92,12 +92,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'force_update'       => (filter_input(INPUT_POST, 'force_update') ? true : false),
 		/** true to skip processing of files already in the filemanager */
 		'ignore_existing'    => (filter_input(INPUT_POST, 'ignore_existing') ? true : false),
+		/** whether to allow multiple image variants for a single product */
+		'allow_variants'     => (filter_input(INPUT_POST, 'allow_variants') ? true : false),
 		/** custom naming convention, if any, used to match multiple image filenames to a single product */
 		'code_suffix'        => $code_suffix,
 		/** custom regexp used to match multiple products to a single image file */
 		'regexp'             => filter_input(INPUT_POST, 'regexp')
 	);
-	$show_advanced = !empty($options['regexp']);
+	$show_advanced = !empty($code_suffix) || !empty($options['regexp']);
 	$show_options = ($show_advanced || !empty($options['add_product']) || !empty($options['add_product_matrix']) || !empty($options['update_matrix']) || !empty($options['code_suffix']));
 	if (empty($errors)) {
 		$dbc = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
@@ -179,18 +181,10 @@ $directories = getDirectories(PATH, true);
 			<h4>Options: Image Relationships [ <a id="options-toggle" href="#options-toggle" onclick="toggle('options')"><?php echo (empty($show_options) ? 'Show' : 'Hide'); ?></a> ]</h4>
 			<div <?php echo (empty($show_options) ? 'class="toggle" ' : ''); ?>id="options">
 				<div class="light-border">
-					<p>Options related to creating relationships between imported image files and existing products.<br>[<a id="rel_details-toggle" href="#rel_details-toggle" onclick="toggle('rel_details')">Show Details</a>]</p>
-					<div class="toggle" id="rel_details">
-						<div class="light-border">
-							<p>An image is considered to match a product when the filename (not including file extensions) is identical to the product code.</p>
-							<p>Multiple image relationships can be created by naming your files e.g. 'code-1.jpg', 'code_2.gif', etc., using either a hyphen, underscore, or neither before a number. You may optionally define your own variant naming convention, e.g. '-var' would match 'ABC123-var0', 'ABC123-var-1', and 'ABC123-var_2' to the product code 'ABC123', but would not match 'ABC1234' or 'ABC123-1'</p>
-							<p>If the filename is an exact match for a matrix entry's product code, that will take precedence over adding the file as an additional image for the main product.</p>
-							<p>Note that this works best when the product(s) with all related options and matrix entries have already been added.</p>
-							<p>Note also that the default CubeCart skin does not support displaying individual matrix images, and custom skins may handle them differently. As such, updating the 'option_matrix.image' may not have any observable effect in your store.</p>
-						</div>
-					</div>
+					<p>Options related to creating relationships between imported image files and existing products.</p>
 					<input type="checkbox" id="add_product" name="add_product"<?php echo (empty($options['add_product']) ? '' : ' checked="checked"'); ?> />
 					<label for="add_product" class="fleft">Add product:image relationships for product matches</label>
+					<br><small>An image is considered to match a product when the filename (not including file extensions) is identical to the product code.</small>
 					<div class="clear"></div><br>
 					<input type="checkbox" id="add_product_matrix" name="add_product_matrix"<?php echo (empty($options['add_product_matrix']) ? '' : ' checked="checked"'); ?> />
 					<label for="add_product_matrix" class="fleft">Add product:image relationships for product matrix matches<br>(don't check this if you want matrix images separate from the main product!)</label>
@@ -200,21 +194,32 @@ $directories = getDirectories(PATH, true);
 					<div class="clear"></div><br>
 					<input type="checkbox" id="update_matrix" name="update_matrix"<?php echo (empty($options['update_matrix']) ? '' : ' checked="checked"'); ?> />
 					<label for="update_matrix" class="fleft">Update the 'option_matrix.image' column when the above relationship is added</label>
+					<br><small>Note that the default CubeCart skin does not support displaying individual matrix images, and custom skins may handle them differently.</small>
+					<br><small>As such, checking this option may not have any observable effect in your store.</small>
 					<div class="clear"></div><br>
 					<input type="checkbox" id="force_update" name="force_update"<?php echo (empty($options['force_update']) || $options['force_update'] == '0' ? '' : ' checked="checked"'); ?> />
 					<label for="force_update" class="fleft">Overwrite any existing data when updating the 'option_matrix.image' column</label>
 					<div class="clear"></div><br>
 					<input type="checkbox" id="ignore_existing" name="ignore_existing"<?php echo (isset($options['ignore_existing']) && !$options['ignore_existing'] ? '' : ' checked="checked"'); ?> />
 					<label for="ignore_existing" class="fleft">Add relationships for new files only</label>
-					<div class="clear"></div><br>
-					<label for="code_suffix">Variant Image Naming Convention</label><br>
-					<small>Click 'Show Details' above for further information.</small><br>
-					<input type="text" id="code_suffix" name="code_suffix"<?php echo (empty($errors['code_suffix']) ? '' : ' class="error"'); ?> value="<?php echo (empty($options['code_suffix']) ? '' : htmlspecialchars($options['code_suffix'])); ?>" placeholder="e.g. -var" />
-					<?php echo (empty($errors['code_suffix']) ? '' : '<br><span class="error">' . $errors['code_suffix'] . '</span>'); ?>
-					<br>
+					<div class="clear"></div>
 					<h4>Advanced [ <a id="advanced-toggle" href="#advanced-toggle" onclick="toggle('advanced')"><?php echo (empty($show_advanced) ? 'Show' : 'Hide'); ?></a> ]</h4>
 					<div <?php echo (empty($show_advanced) ? 'class="toggle" ' : ''); ?>id="advanced">
 						<div class="light-border">
+							<h3>Image Variants</h3>
+							<p>Multiple image relationships can be created by naming your files e.g. 'code-1.jpg', 'code_2.gif', etc., using either a hyphen, underscore, or neither before a number.</p>
+							<p>You may optionally define your own variant naming convention, e.g. '-var' would match 'ABC123-var0', 'ABC123-var-1', and 'ABC123-var_2' to the product code 'ABC123', but would not match 'ABC1234' or 'ABC123-1'</p>
+							<p>If the filename is an exact match for a matrix entry's product code, that will take precedence over adding the file as an additional image for the main product.</p>
+							<p>Note that this works best when the product(s) with all related options and matrix entries have already been added.</p>
+							<input type="checkbox" id="allow_variants" name="allow_variants"<?php echo (isset($options['allow_variants']) && !$options['allow_variants'] ? '' : ' checked="checked"'); ?> />
+							<label for="allow_variants" class="fleft">Allow multiple image variants per product (as described above)</label>
+							<div class="clear"></div><br>
+							<label for="code_suffix"><strong>Naming Convention</strong></label>
+							<input type="text" id="code_suffix" name="code_suffix"<?php echo (empty($errors['code_suffix']) ? '' : ' class="error"'); ?> value="<?php echo (empty($options['code_suffix']) ? '' : htmlspecialchars($options['code_suffix'])); ?>" placeholder="e.g. -var" />
+							<br><small>Has no effect if image variants are not allowed (see previous checkbox)</small>
+							<?php echo (empty($errors['code_suffix']) ? '' : '<br><span class="error">' . $errors['code_suffix'] . '</span>'); ?>
+							<br>
+							<h3>Advanced Matching</h3>
 							<p>Enter a custom regular expression for matching the image filename(s) to product codes.</p>
 							<label for="regexp"><strong>Regular Expression</strong></label>
 							<input type="text" id="regexp" name="regexp"<?php echo (empty($errors['regexp']) ? '' : ' class="error"'); ?> value="<?php echo (empty($options['regexp']) ? '' : htmlspecialchars($options['regexp'])); ?>" placeholder="e.g. ^CodeY(S|M|L)$" />
@@ -707,6 +712,8 @@ function getPreparedStatements($dbc, array $options = array()) {
 	
 	// prepared statement to check for products and matrix entries with codes matching the filename
 	// params = 'issss', file_id, filename x 4 (x 3 if custom regexp supplied)
+	$var_match = (empty($options['allow_variants']) ? '' : '(-|_)?[0-9]+');
+	$suffix = (empty($options['allow_variants']) || empty($options['code_suffix']) ? '' : $options['code_suffix']);
 	$q = "SELECT 
 			product.product_id,
 			product.product_code,
@@ -720,25 +727,26 @@ function getPreparedStatements($dbc, array $options = array()) {
 		LEFT JOIN `$prefix" . "_option_matrix` matrix ON matrix.product_id=product.product_id 
 			AND (
 				# match product code: exact, code-var1, or user-defined regexp e.g. codeY(S|M|L)
-				matrix.product_code=? OR 
-				? REGEXP CONCAT('^(', matrix.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')
-				 " . (empty($options['regexp']) ? '' : " OR matrix.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'") . "
+				matrix.product_code=? 
+				OR ? REGEXP CONCAT('^(', matrix.product_code, '" . (empty($suffix) ? ')' : "$suffix)$var_match") . "$')" . 
+				(empty($options['regexp'])
+					? ''
+					: " OR matrix.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'"
+				) . "
 			)
 		LEFT JOIN `$prefix" . "_image_index` matrix_img ON matrix_img.id=matrix.image 
 		LEFT JOIN `$prefix" . "_filemanager` filemanager ON filemanager.file_id=matrix_img.file_id 
 		WHERE matrix.matrix_id IS NOT NULL OR 
 			((product.product_code=? 
-				OR (
-					# ??? Only perform matching if there is not an exact match for this code
+				OR ( # Only try matching if there is not an exact match for this product code
 					matrix.matrix_id IS NULL AND 
 						(" . (empty($options['regexp']) 
-								? "? REGEXP CONCAT('^(', product.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')" 
+								? "? REGEXP CONCAT('^(', product.product_code, '" . (empty($suffix) ? ')' : "$suffix)$var_match") . "$')"
 								: "product.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'"
 							) . "
-						#OR ? REGEXP CONCAT('^(', product.product_code, '" . (empty($options['code_suffix']) ? '' : $options['code_suffix']) . ")(-|_)?[0-9]+$')
 						)
 					)
-				)# AND img.id IS NULL
+				)
 			)
 		ORDER BY COALESCE(matrix.product_code, product.product_code)";
 	$stmts['find_products'] = $dbc->prepare($q);
