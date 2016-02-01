@@ -551,48 +551,60 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 	}
 	$products = fetch_assoc_stmt($stmts['find_products'], true);
 	
-	// Check results to make sure all belong to same product id
+	// Check results when not matching by regular expression to make sure all belong to same product id
 	// TODO ? check for duplicate product codes => SELECT COUNT(*) AS `count`, product_code FROM cubecart_option_matrix GROUP BY product_code HAVING `count` > 1;
 	// TODO ? provide option to allow multiple products to be updated with the same image
-	$product = false;
-	foreach ($products as $match) {
-		if (!$product) {
-			$product = $match;
-		} elseif ($match['product_id'] != $product['product_id']) {
-			$message .= "<br>ERROR: At least two products matched the file <strong>$code</strong>:<br>Product ID: $product[product_id] - Product Code: $product[product_code]<br>Product ID: $match[product_id] - Product Code: $match[product_code]";
-			return false;
+	if (empty($options['regexp'])) {
+		$product = false;
+		foreach ($products as $match) {
+			if (!$product) {
+				$product = $match;
+			} elseif ($match['product_id'] != $product['product_id']) {
+				$message .= "<br>ERROR: At least two products matched the file <strong>$code</strong>:<br>Product ID: $product[product_id] - Product Code: $product[product_code]<br>Product ID: $match[product_id] - Product Code: $match[product_code]";
+				return false;
+			}
 		}
 	}
-	// All results are for same product - build relationships
-	$rel_id = false;
+	// Build relationships for each product
+	$relations = array();
 	foreach ($products as $match) {
 		// Check for existing relationship (cannot use INSERT IGNORE due to lack of useful unique key)
-		if (is_int($rel_id)) {
+		if (array_key_exists($match['product_id'], $relations)) {
 			// relationship already established on product:image level - move on to next part
 		} elseif (!$stmts['relation_exists']->bind_param('ii', $match['product_id'], $file_id) || !$stmts['relation_exists']->execute()) {
 			$message .= "<br>ERROR: Database error checking for existing product:image relationships: $stmts[relation_exists]->errno - $stmts[relation_exists]->error";
 			return false;
-		} elseif (empty($rel_id = fetch_assoc_stmt($stmts['relation_exists']))) {
+		} elseif (empty($relations[$match['product_id']] = fetch_assoc_stmt($stmts['relation_exists']))) {
 			// No previous product:image relationship exists for this file
-			if ((empty($match['matrix_id']) ? $add_product : $add_product_matrix)) {
+			$product_match = ($match['product_code'] === $code);
+			if (!$product_match) {
+				$regexp = (empty($options['regexp']) ? '' : "/$options[regexp]/i");
+				if (empty($regexp)) {
+					$var_match = (empty($options['allow_variants']) ? '' : '(-|_)?[0-9]+');
+					$suffix = (empty($options['allow_variants']) || empty($options['code_suffix']) ? '' : $options['code_suffix']);
+					$regexp = "/^$match[product_code]" . (empty($suffix) ? '' : "$suffix$var_match") . "$/i";
+				}
+				$product_match = preg_match($regexp, $code);
+			}
+			if (($product_match && $add_product) || (!empty($match['matrix_id']) && $add_product_matrix)) {
 				if (!empty($options['dry_run'])) {
-					$rel_id = 0; // non-existent index for dry run
+					$relations[$match['product_id']] = 0; // non-existent index for dry run
 				} elseif (!$stmts['add_product_img']->bind_param('iis', $match['product_id'], $file_id, $options['main_image']) || !$stmts['add_product_img']->execute()) {
 					$message .= "<br>ERROR: Database error adding new product:image relationship: $stmts[add_product_img]->errno - $stmts[add_product_img]->error";
 					return false;
 				} else {
-					$rel_id = $stmts['add_product_img']->insert_id;
+					$relations[$match['product_id']] = $stmts['add_product_img']->insert_id;
 				}
-				if (!is_int($rel_id)) {
-					$message .="<br>ERROR: Failed to add product:image relationship - invalid insertion ID";
+				if (!is_int($relations[$match['product_id']])) {
+					$message .= "<br>ERROR: Failed to add product:image relationship - invalid insertion ID";
 					return false;
-				} elseif (empty($options['dry_run']) || $added === 0) {
+				} else {
 					$added++;
-					$message .= "<br>NOTICE: File associated with product $match[product_id] - $match[product_code]; image index = $rel_id";
+					$message .= "<br>NOTICE: File associated with product $match[product_id] - $match[product_code]; image index = {$relations[$match['product_id']]}";
 				}
 			}
 		} else {
-			$message .= "<br>NOTICE: File id $file_id is already associated with product $match[product_id] - $match[product_code]; image_index id = $rel_id";
+			$message .= "<br>NOTICE: File id $file_id is already associated with product $match[product_id] - $match[product_code]; image_index id = {$relations[$match['product_id']]}";
 		}
 		// Update matrix image entries if applicable
 		if ($update_matrix && !empty($match['matrix_id'])) {
@@ -748,7 +760,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 					)
 				)
 			)
-		ORDER BY COALESCE(matrix.product_code, product.product_code)";
+		ORDER BY product.product_id, COALESCE(matrix.product_code, product.product_code)";
 	$stmts['find_products'] = $dbc->prepare($q);
 	
 	// Prepared statement to update file size value of existing file entries (e.g. if image was resized)
