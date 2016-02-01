@@ -147,12 +147,13 @@ $directories = getDirectories(PATH, true);
 	.toggle { display:none;}
 	.wide { width: 80%;}
 	.light-border { border: 1px solid black; margin-bottom:20px;}
-	.light-border > * { margin-left: 20px; margin-right: 20px;}
+	.light-border > .inner { margin-left: 20px; margin-right: 20px;}
 	ul.navigable_tree { margin:0; list-style:none; float:left;}
 	li > ul { padding-left:30px; list-style:none;}
 	ul.navigable_tree, .tree_header { padding-left:40px;}
 	li.branch, li.branch > a { color:blue; }
 	li.leaf, li.leaf > a { color:orange; text-decoration:none;}
+	input, label { margin-right: 20px;}
 	input[type=checkbox] { float:left;}
 	input.error { border: 2px solid #800517;}
 	span.error { color: #800517; font-weight: bold;}
@@ -180,14 +181,15 @@ $directories = getDirectories(PATH, true);
 			<div class="clear"></div>
 			<h4>Options: Image Relationships [ <a id="options-toggle" href="#options-toggle" onclick="toggle('options')"><?php echo (empty($show_options) ? 'Show' : 'Hide'); ?></a> ]</h4>
 			<div <?php echo (empty($show_options) ? 'class="toggle" ' : ''); ?>id="options">
-				<div class="light-border">
+				<div class="light-border"><div class="inner">
 					<p>Options related to creating relationships between imported image files and existing products.</p>
 					<input type="checkbox" id="add_product" name="add_product"<?php echo (empty($options['add_product']) ? '' : ' checked="checked"'); ?> />
 					<label for="add_product" class="fleft">Add product:image relationships for product matches</label>
 					<br><small>An image is considered to match a product when the filename (not including file extensions) is identical to the product code.</small>
 					<div class="clear"></div><br>
 					<input type="checkbox" id="add_product_matrix" name="add_product_matrix"<?php echo (empty($options['add_product_matrix']) ? '' : ' checked="checked"'); ?> />
-					<label for="add_product_matrix" class="fleft">Add product:image relationships for product matrix matches<br>(don't check this if you want matrix images separate from the main product!)</label>
+					<label for="add_product_matrix" class="fleft">Add product:image relationships for product matrix matches</label>
+					<br><small>Don't check this if you want matrix images separate from the main product!</small>
 					<div class="clear"></div><br>
 					<input type="checkbox" id="main_image" name="main_image"<?php echo (empty($options['main_image']) ? '' : ' checked="checked"'); ?> />
 					<label for="main_image" class="fleft">Add each image as a 'Main Image'</label>
@@ -205,7 +207,7 @@ $directories = getDirectories(PATH, true);
 					<div class="clear"></div>
 					<h4>Advanced [ <a id="advanced-toggle" href="#advanced-toggle" onclick="toggle('advanced')"><?php echo (empty($show_advanced) ? 'Show' : 'Hide'); ?></a> ]</h4>
 					<div <?php echo (empty($show_advanced) ? 'class="toggle" ' : ''); ?>id="advanced">
-						<div class="light-border">
+						<div class="light-border"><div class="inner">
 							<h3>Image Variants</h3>
 							<p>Multiple image relationships can be created by naming your files e.g. 'code-1.jpg', 'code_2.gif', etc., using either a hyphen, underscore, or neither before a number.</p>
 							<p>You may optionally define your own variant naming convention, e.g. '-var' would match 'ABC123-var0', 'ABC123-var-1', and 'ABC123-var_2' to the product code 'ABC123', but would not match 'ABC1234' or 'ABC123-1'</p>
@@ -226,8 +228,8 @@ $directories = getDirectories(PATH, true);
 							<p>Example: Assuming you have a product that comes in various colors (e.g. R, Y, B) and sizes (e.g. S, M, L) with product codes in the format 'CodeColorSize', if you wanted to use the same image for every yellow version of the product, you could enter <em>^CodeY(S|M|L)$</em>; this would match products and matrix entries for CodeYS, CodeYM, and CodeYL.</p>
 							<p>WARNINGS<p><ol><li>Do not use if you are not comfortable with regular expressions</li><li>Not recommended for use with directories, i.e. use for one image file at a time</li><li>Always perform a <strong>Dry Run</strong> first!</li></ol>
 						</div>
-					</div>
-				</div>
+					</div></div>
+				</div></div>
 			</div>
 			<button type="submit" name="btn_dry" title="View results without changing the database">Dry-Run</button>
 			<button type="submit">Submit</button>

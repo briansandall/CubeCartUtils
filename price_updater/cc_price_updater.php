@@ -186,6 +186,7 @@ $directories = getDirectories(PATH, true);
 	li.branch, li.branch > a { color:blue; }
 	li.leaf, li.leaf > a { color:orange; text-decoration:none;}
 	.alert { color: #ff0000;}
+	input, label { margin-right: 20px;}
 	input[type=checkbox] { float:left;}
 	input.error { border: 2px solid #800517;}
 	span.error { color: #800517; font-weight: bold;}
