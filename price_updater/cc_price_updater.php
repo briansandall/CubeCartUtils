@@ -112,6 +112,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'disable_products'      => isset($_POST['disable_products']),
 		/** true to perform a dry run on price updates in order to check for and disable missing products */
 		'disable_only'      => isset($_POST['btn_disable']),
+		/** true to disable warnings for products found on the price list but not in the database */
+		'ignore_missing'    => isset($_POST['ignore_missing']),
 		// TODO option to save warnings to disk
 	);
 	if (!$options['update_matrix'] && ($options['update_main_price'] || $options['disable_products'])) {
@@ -259,6 +261,10 @@ $directories = getDirectories(PATH, true);
 			<label for="allow_upsell" class="fleft">Allow 'sale' prices to be greater than the list price*</label>
 			<div class="clear"></div>
 			<small>* If such is the case, the 'sale' price will be used as the list price, and the item will not be considered 'on sale'</small>
+			<br><br>
+			<input type="checkbox" id="ignore_missing" name="ignore_missing"<?php echo (!empty($options['ignore_missing']) ? ' checked="checked"' : ''); ?> />
+			<label for="ignore_missing" class="fleft">Disable warnings for products found on the price list but not in the database</label>
+			<div class="clear"></div>
 			<h4>MATRIX OPTIONS</h4>
 			<?php echo (MATRIX_STATUS_ON ? '' : '<p>You must enable MATRIX_STATUS_ON in the script file in order to use any of the <strong>Matrix Options</strong>.</p>'); ?>
 			<?php echo (empty($errors['matrix_options']) ? '' : '<p><span class="error">ERROR: ' . $errors['matrix_options'] . '</span></p>'); ?>
@@ -567,43 +573,37 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				if ($select_only) {
 					if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
-					} elseif (empty(fetch_assoc_stmt($stmts['select_product']))) {
-						$result['not_found'][$product_code] = "Product not found in database; Manufacturer: $manufacturer | Product Code: $product_code";
-					} else {
+					} elseif (!empty(fetch_assoc_stmt($stmts['select_product']))) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+					} elseif (!$options['ignore_missing']) {
+						$result['not_found'][$product_code] = "Product not found in database; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
-						} elseif (empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
-							if (array_key_exists($product_code, $result['not_found'])) {
-								$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
-							}
-						} else {
+						} elseif (!empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
 							$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 							$updated[$product_id][] = $product_code;
 							// wasn't found as a product, but found as a matrix entry
 							if (array_key_exists($product_code, $result['not_found'])) {
 								unset($result['not_found'][$product_code]); 
 							}
+						} elseif (array_key_exists($product_code, $result['not_found'])) {
+							$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
 						}
 					}
 				} else {
 					if (!$stmts['update_product']->bind_param('dddss', $list_price, $cost_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
-					} elseif ($stmts['update_product']->affected_rows < 1) {
-						$result['not_found'][$product_code] = "Product not found; Manufacturer: $manufacturer | Product Code: $product_code";
-					} else {
+					} elseif ($stmts['update_product']->affected_rows > 0) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+					} elseif (!$options['ignore_missing']) {
+						$result['not_found'][$product_code] = "Product not found; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['update_matrix']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
-						} elseif ($stmts['update_matrix']->affected_rows < 1) {
-							if (array_key_exists($product_code, $result['not_found'])) {
-								$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
-							}
-						} else {
+						} elseif ($stmts['update_matrix']->affected_rows > 0) {
 							if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 								throw new \RuntimeException("Query to select product id from matrix table failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
 							} elseif (empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
@@ -616,6 +616,8 @@ function updatePrices($dbc, $filename, array $options = array()) {
 									unset($result['not_found'][$product_code]); 
 								}
 							}
+						} elseif (array_key_exists($product_code, $result['not_found'])) {
+							$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
 						}
 					}
 				}
