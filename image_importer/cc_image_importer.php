@@ -580,13 +580,16 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 			// No previous product:image relationship exists for this file
 			$product_match = ($match['product_code'] === $code);
 			if (!$product_match) {
-				$regexp = (empty($options['regexp']) ? '' : "/$options[regexp]/i");
-				if (empty($regexp)) {
+				if (empty($options['regexp'])) {
+					// Check if the image file could be considered a 'variant' image
 					$var_match = (empty($options['allow_variants']) ? '' : '(-|_)?[0-9]+');
 					$suffix = (empty($options['allow_variants']) || empty($options['code_suffix']) ? '' : $options['code_suffix']);
 					$regexp = "/^$match[product_code]" . (empty($suffix) ? '' : "$suffix$var_match") . "$/i";
+					$product_match = preg_match($regexp, $code);
+				} else {
+					// Match the product code against the regexp, completely ignoring the image file's name
+					$product_match = preg_match("/$options[regexp]/i", $match['product_code']);
 				}
-				$product_match = preg_match($regexp, $code);
 			}
 			if (($product_match && $add_product) || (!empty($match['matrix_id']) && $add_product_matrix)) {
 				if (!empty($options['dry_run'])) {
