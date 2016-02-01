@@ -557,9 +557,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			foreach ($data as $entry) {
 				$manufacturer = (empty($entry[$labels['manufacturer']['label']]) ? $options['manufacturer'] : $entry[$labels['manufacturer']['label']]);
 				$product_code = $entry[$labels['product_code']['label']];
-				$list_price = round_up($entry[$labels['list_price']['label']], 2);
-				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up($entry[$labels['cost_price']['label']], 2) : null);
-				$sale_price = round_up($entry[$labels['sale_price']['label']], 2);
+				$list_price = round_up(getAmount($entry[$labels['list_price']['label']]), 2);
+				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up(getAmount($entry[$labels['cost_price']['label']]), 2) : null);
+				$sale_price = round_up(getAmount($entry[$labels['sale_price']['label']]), 2);
 				if ($sale_price > $list_price && $options['allow_upsell']) {
 					$list_price = $sale_price;
 					$sale_price = null;
@@ -725,6 +725,17 @@ function fetch_assoc_stmt($stmt, $force_assoc = false, $buffer = true) {
  */
 function copy_value($v) {
 	return $v;
+}
+
+/**
+ * De-formats a currency string into standard float amount.
+ * Adapted from StackOverflow: http://stackoverflow.com/a/19764699
+ */
+function getAmount($money) {
+	$cleanString = preg_replace('/([^0-9\.,])/i', '', $money);
+	$onlyNumbersString = preg_replace('/([^0-9])/i', '', $money);
+	$separatorsCountToBeErased = strlen($cleanString) - strlen($onlyNumbersString) - 1;
+	return (float) preg_replace('/([,\.])/', '', $cleanString, $separatorsCountToBeErased);
 }
 
 /** @author mvds from http://stackoverflow.com/questions/8771842/always-rounding-decimals-up-to-specified-precision */
