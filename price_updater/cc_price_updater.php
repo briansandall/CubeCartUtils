@@ -75,12 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	} else {
 		$errors['file'] = '* Required field';
 	}
+	$required = array('product_code'=>true,'list_price'=>true,'sale_price'=>true);
 	$header_labels = filter_input(INPUT_POST, 'header_labels', FILTER_DEFAULT, FILTER_REQUIRE_ARRAY);
 	if (!is_array($header_labels)) {
 		$errors['header_labels']['missing'] = '* Please enter valid header labels';
 	} else {
 		foreach ($header_labels as $k => $v) {
-			if (empty($v) && $k !== 'manufacturer') {
+			if (empty($v) && !empty($required[$k])) {
 				$errors['header_labels'][$k] = '* Required field';
 			} elseif (!preg_match('/^[a-z0-9-_\040]+$/i', $v)) {
 				$errors['header_labels'][$k] = '* Only letters, digits, spaces, hyphens, and underscores are allowed';
