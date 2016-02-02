@@ -101,19 +101,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				'manufacturer' => array('label'=>$header_labels['manufacturer'], 'required'=>false),
 			),
 		/** allow 'sale' prices to be greater than the list price */
-		'allow_upsell'          => isset($_POST['allow_upsell']),
+		'allow_upsell'       => isset($_POST['allow_upsell']),
 		/** sets status of products / matrix entries that have a price update to enabled */
-		'enable_updated'        => isset($_POST['enable_updated']),
+		'enable_updated'     => isset($_POST['enable_updated']),
 		/** true to update prices in the option matrix - only select if your database supports this! */
 		'update_matrix'      => isset($_POST['update_matrix']),
 		/** update the main product price with the lowest non-zero matrix price */
-		'update_main_price'     => isset($_POST['update_main_price']),
+		'update_main_price'  => isset($_POST['update_main_price']),
 		/** true to disable product and matrix codes that exist in the database but weren't found on the price list */
-		'disable_products'      => isset($_POST['disable_products']),
+		'disable_products'   => isset($_POST['disable_products']),
 		/** true to perform a dry run on price updates in order to check for and disable missing products */
-		'disable_only'      => isset($_POST['btn_disable']),
+		'disable_only'       => isset($_POST['btn_disable']),
 		/** true to disable warnings for products found on the price list but not in the database */
-		'ignore_missing'    => isset($_POST['ignore_missing']),
+		'ignore_missing'     => isset($_POST['ignore_missing']),
 		// TODO option to save warnings to disk
 	);
 	if (!$options['update_matrix'] && ($options['update_main_price'] || $options['disable_products'])) {
