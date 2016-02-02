@@ -100,6 +100,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				'sale_price'   => array('label'=>$header_labels['sale_price'], 'required'=>true),
 				'manufacturer' => array('label'=>$header_labels['manufacturer'], 'required'=>false),
 			),
+		/** true to update the main product's date modified field if the product's pricing changes */
+		'update_date'        => isset($_POST['update_date']),
+		/** true to update the date modified field for any product found on the price list, irrespective of price changes */
+		'update_date_all'    => isset($_POST['update_date_all']),
 		/** allow 'sale' prices to be greater than the list price */
 		'allow_upsell'       => isset($_POST['allow_upsell']),
 		/** sets status of products / matrix entries that have a price update to enabled */
@@ -255,6 +259,12 @@ $directories = getDirectories(PATH, true);
 				<?php echo (empty($errors['header_labels']['sale_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['sale_price'] . '</span>'); ?>
 			</div><div class="clear"></div>
 			<p>Other Options</p>
+			<input type="checkbox" id="update_date" name="update_date"<?php echo (isset($options['update_date']) && !$options['update_date'] ? '' : ' checked="checked"'); ?> />
+			<label for="update_date" class="fleft">Update the modification date for products whose prices change</label>
+			<div class="clear"></div><br>
+			<input type="checkbox" id="update_date_all" name="update_date_all"<?php echo (!empty($options['update_date_all']) ? ' checked="checked"' : ''); ?> />
+			<label for="update_date_all" class="fleft">Update the modification date for any product found on the price list, whether or not its price(s) changed</label>
+			<div class="clear"></div><br>
 			<input type="checkbox" id="enable_updated" name="enable_updated"<?php echo (!empty($options['enable_updated']) ? ' checked="checked"' : ''); ?> />
 			<label for="enable_updated" class="fleft">Automatically enable products (and matrix entries, if applicable) whose prices are updated</label>
 			<div class="clear"></div><br>
@@ -571,19 +581,22 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					$list_price = $sale_price;
 					$sale_price = null;
 				}
+				$changed = false; // flag indicating product (or matrix) prices changed
 				if ($select_only) {
 					if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
 					} elseif (!empty(fetch_assoc_stmt($stmts['select_product']))) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						$changed = true;
 					} elseif (!$options['ignore_missing']) {
-						$result['not_found'][$product_code] = "Product not found in database; Manufacturer: $manufacturer | Product Code: $product_code";
+						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
 						} elseif (!empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
 							$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+							$changed = true;
 							$updated[$product_id][] = $product_code;
 							// wasn't found as a product, but found as a matrix entry
 							if (array_key_exists($product_code, $result['not_found'])) {
@@ -598,8 +611,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
 					} elseif ($stmts['update_product']->affected_rows > 0) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						$changed = true;
 					} elseif (!$options['ignore_missing']) {
-						$result['not_found'][$product_code] = "Product not found; Manufacturer: $manufacturer | Product Code: $product_code";
+						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['update_matrix']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
@@ -611,6 +625,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 								$result['failed'][] = "Matrix entry not found after updating! Manufacturer: $manufacturer | Product Code: $product_code";
 							} else {
 								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+								$changed = true;
 								$updated[$product_id][] = $product_code;
 								// wasn't found as a product, but found as a matrix entry
 								if (array_key_exists($product_code, $result['not_found'])) {
@@ -618,8 +633,18 @@ function updatePrices($dbc, $filename, array $options = array()) {
 								}
 							}
 						} elseif (array_key_exists($product_code, $result['not_found'])) {
-							$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							$result['not_found'][$product_code] = "Neither product nor matrix entry was found or updated; Manufacturer: $manufacturer | Product Code: $product_code";
 						}
+					}
+				}
+				// Product was found and updated - update 'date updated' field
+				if ($options['update_date_all'] || ($changed && $options['update_date'])) {
+					if ($select_only) {
+						$result['updated'][] = "Date modified updated for $manufacturer product $product_code";
+					} elseif (!$stmts['update_date']->bind_param('ss', $product_code, $manufacturer) || !$stmts['update_date']->execute()) {
+						throw new \RuntimeException("Update date query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_date']->errno} - {$stmts['update_date']->error}");
+					} else {
+						$result['updated'][] = "Date modified updated for $manufacturer product $product_code";
 					}
 				}
 			}
@@ -771,7 +796,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 	} else {
 		// update prices for matching products
 		// params = 'dddss', price, cost_price, sale price, product code, manufacturer
-		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=?, i.updated=CURRENT_TIMESTAMP WHERE i.product_code=? AND mf.name=?";
+		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=? WHERE i.product_code=? AND mf.name=?";
 		$stmts['update_product'] = $dbc->prepare($q);
 		
 		// update prices for matching option matrix entries
@@ -800,6 +825,12 @@ function getPreparedStatements($dbc, array $options = array()) {
 			$q = "UPDATE `$prefix" . "_inventory` SET `price`=?, `sale_price`=? WHERE `product_id`=?";
 			$stmts['update_main_price'] = $dbc->prepare($q);
 		}
+	}
+	// update product entry's modification date
+	// params = 'ss', product code, manufacturer
+	if ($options['update_date'] || $options['update_date_all']) {
+		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET i.updated=CURRENT_TIMESTAMP WHERE i.product_code=? AND mf.name=?";
+		$stmts['update_date'] = $dbc->prepare($q);
 	}
 	//=== Statements for updating 'enabled' status of products and, if supported, matrix entries ===//
 	if ($options['disable_products']) {
