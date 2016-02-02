@@ -100,6 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 				'cost_price'   => array('label'=>$header_labels['cost_price'], 'required'=>false),
 				'sale_price'   => array('label'=>$header_labels['sale_price'], 'required'=>true),
 				'manufacturer' => array('label'=>$header_labels['manufacturer'], 'required'=>false),
+				'upc'          => array('label'=>$header_labels['upc'], 'required'=>false),
 			),
 		/** true to update the main product's date modified field if the product's pricing changes */
 		'update_date'        => isset($_POST['update_date']),
@@ -119,6 +120,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'disable_only'       => isset($_POST['btn_disable']),
 		/** true to disable warnings for products found on the price list but not in the database */
 		'ignore_missing'     => isset($_POST['ignore_missing']),
+		/** true to check for and update product UPC codes */
+		'upc_update'         => isset($_POST['upc_update']),
+		/** true to overwrite any existing UPC codes with those on the price list */
+		'upc_overwrite'      => isset($_POST['upc_overwrite']),
 		// TODO option to save warnings to disk
 	);
 	if (!$options['update_matrix'] && ($options['update_main_price'] || $options['disable_products'])) {
@@ -249,7 +254,7 @@ $directories = getDirectories(PATH, true);
 				<input type="text" id="header_list_price" name="header_labels[list_price]"<?php echo (empty($errors['header_labels']['list_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['list_price']) ? htmlspecialchars($header_labels['list_price']) . '"' : 'List Price'); ?>" required="required" title="List price for the product" />
 				<?php echo (empty($errors['header_labels']['list_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['list_price'] . '</span>'); ?>
 			</div><div class="fleft half">
-				<label for="header_cost_price" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price"><strong>Sale Price Header Label</strong></label><br>
+				<label for="header_cost_price" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price"><strong>Cost Price Header Label</strong></label><br>
 				<input type="text" id="header_cost_price" name="header_labels[cost_price]"<?php echo (empty($errors['header_labels']['cost_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['cost_price']) ? htmlspecialchars($header_labels['cost_price']) . '"' : 'Cost'); ?>" title="Price at which your company can procure the product" />
 				<?php echo (empty($errors['header_labels']['cost_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['cost_price'] . '</span>'); ?>
 			</div><div class="clear"></div>
@@ -258,6 +263,10 @@ $directories = getDirectories(PATH, true);
 				<label for="header_sale_price" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price"><strong>Sale Price Header Label</strong></label><br>
 				<input type="text" id="header_sale_price" name="header_labels[sale_price]"<?php echo (empty($errors['header_labels']['sale_price']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['sale_price']) ? htmlspecialchars($header_labels['sale_price']) . '"' : 'Price'); ?>" required="required" title="Price for which the product will actually be sold, i.e. the 'Sale Price' - should not be greater than the List Price" />
 				<?php echo (empty($errors['header_labels']['sale_price']) ? '' : '<br><span class="error">' . $errors['header_labels']['sale_price'] . '</span>'); ?>
+			</div><div class="fleft half">
+				<label for="header_upc" title="UPC column header"><strong>UPC Header Label</strong> (optional)</label><br>
+				<input type="text" id="header_upc" name="header_labels[upc]"<?php echo (empty($errors['header_labels']['upc']) ? '' : ' class="error"'); ?> value="<?php echo (isset($header_labels['upc']) ? htmlspecialchars($header_labels['upc']) . '"' : 'UPC'); ?>" title="UPC column header" />
+				<?php echo (empty($errors['header_labels']['upc']) ? '' : '<br><span class="error">' . $errors['header_labels']['upc'] . '</span>'); ?>
 			</div><div class="clear"></div>
 			<p>Other Options</p>
 			<input type="checkbox" id="update_date" name="update_date"<?php echo (isset($options['update_date']) && !$options['update_date'] ? '' : ' checked="checked"'); ?> />
@@ -271,11 +280,17 @@ $directories = getDirectories(PATH, true);
 			<div class="clear"></div><br>
 			<input type="checkbox" id="allow_upsell" name="allow_upsell"<?php echo (!empty($options['allow_upsell']) ? ' checked="checked"' : ''); ?> />
 			<label for="allow_upsell" class="fleft">Allow 'sale' prices to be greater than the list price*</label>
-			<div class="clear"></div>
-			<small>* If such is the case, the 'sale' price will be used as the list price, and the item will not be considered 'on sale'</small>
-			<br><br>
+			<br><small>* If such is the case, the 'sale' price will be used as the list price, and the item will not be considered 'on sale'</small>
+			<div class="clear"></div><br>
 			<input type="checkbox" id="ignore_missing" name="ignore_missing"<?php echo (!empty($options['ignore_missing']) ? ' checked="checked"' : ''); ?> />
 			<label for="ignore_missing" class="fleft">Disable warnings for products found on the price list but not in the database</label>
+			<div class="clear"></div><br>
+			<input type="checkbox" id="upc_update" name="upc_update"<?php echo (!empty($options['upc_update']) ? ' checked="checked"' : ''); ?> />
+			<label for="upc_update" class="fleft">Assign UPC codes if the price list contains that data (will not overwrite existing data)</label>
+			<br><small>Note that matrix UPC codes will only be assigned or updated if also updating matrix prices</small>
+			<div class="clear"></div><br>
+			<input type="checkbox" id="upc_overwrite" name="upc_overwrite"<?php echo (!empty($options['upc_overwrite']) ? ' checked="checked"' : ''); ?> />
+			<label for="upc_overwrite" class="fleft">Overwrite existing UPC codes when assigning them from the price list</label>
 			<div class="clear"></div>
 			<h4>MATRIX OPTIONS</h4>
 			<?php echo (MATRIX_STATUS_ON ? '' : '<p>You must enable MATRIX_STATUS_ON in the script file in order to use any of the <strong>Matrix Options</strong>.</p>'); ?>
@@ -575,6 +590,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			foreach ($data as $entry) {
 				$manufacturer = (empty($entry[$labels['manufacturer']['label']]) ? $options['manufacturer'] : $entry[$labels['manufacturer']['label']]);
 				$product_code = $entry[$labels['product_code']['label']];
+				$upc = (!$options['upc_update'] || empty($entry[$labels['upc']['label']]) ? null : $entry[$labels['upc']['label']]);
 				$list_price = round_up(getAmount($entry[$labels['list_price']['label']]), 2);
 				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up(getAmount($entry[$labels['cost_price']['label']]), 2) : null);
 				$sale_price = round_up(getAmount($entry[$labels['sale_price']['label']]), 2);
@@ -608,7 +624,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						}
 					}
 				} else {
-					if (!$stmts['update_product']->bind_param('dddss', $list_price, $cost_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
+					if (!$stmts['update_product']->bind_param('dddsss', $list_price, $cost_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
 					} elseif ($stmts['update_product']->affected_rows > 0) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
@@ -617,7 +633,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
-						if (!$stmts['update_matrix']->bind_param('ddss', $list_price, $sale_price, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
+						if (!$stmts['update_matrix']->bind_param('ddsss', $list_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
 						} elseif ($stmts['update_matrix']->affected_rows > 0) {
 							if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
@@ -796,14 +812,14 @@ function getPreparedStatements($dbc, array $options = array()) {
 		$stmts['select_product'] = $dbc->prepare($q);
 	} else {
 		// update prices for matching products
-		// params = 'dddss', price, cost_price, sale price, product code, manufacturer
-		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=? WHERE i.product_code=? AND mf.name=?";
+		// params = 'dddsss', price, cost_price, sale price, upc, product code, manufacturer
+		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=?, i.upc=" . ($options['upc_update'] && $options['upc_overwrite'] ? '?' : "COALESCE(IF(i.upc='', NULL, i.upc), ?)") . " WHERE i.product_code=? AND mf.name=?";
 		$stmts['update_product'] = $dbc->prepare($q);
 		
 		// update prices for matching option matrix entries
-		// params = 'ddss', price, sale price, product code, manufacturer
+		// params = 'ddsss', price, sale price, upc, product code, manufacturer
 		if ($options['update_matrix']) {
-			$q = "UPDATE `$prefix" . "_option_matrix` m JOIN `$prefix" . "_inventory` i ON i.product_id=m.product_id JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' m.set_enabled=1, ' : '') . "m.price=?, m.sale_price=? WHERE m.product_code=? AND mf.name=?";
+			$q = "UPDATE `$prefix" . "_option_matrix` m JOIN `$prefix" . "_inventory` i ON i.product_id=m.product_id JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' m.set_enabled=1, ' : '') . "m.price=?, m.sale_price=?, m.upc=" . ($options['upc_update'] && $options['upc_overwrite'] ? '?' : "COALESCE(IF(m.upc='', NULL, m.upc), ?)") . " WHERE m.product_code=? AND mf.name=?";
 			$stmts['update_matrix'] = $dbc->prepare($q);
 		}
 	}
