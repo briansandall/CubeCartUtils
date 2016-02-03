@@ -599,10 +599,12 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					$sale_price = null;
 				}
 				$changed = false; // flag indicating product (or matrix) prices changed
+				if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
+					throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
+				}
+				$main_product_id = fetch_assoc_stmt($stmts['select_product']);
 				if ($select_only) {
-					if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
-						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
-					} elseif (!empty(fetch_assoc_stmt($stmts['select_product']))) {
+					if (is_int($main_product_id)) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 						$changed = true;
 					} elseif (!$options['ignore_missing']) {
@@ -624,7 +626,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						}
 					}
 				} else {
-					if (!$stmts['update_product']->bind_param('dddsss', $list_price, $cost_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_product']->execute()) {
+					if (!$stmts['update_product']->bind_param('dddsi', $list_price, $cost_price, $sale_price, $upc, $main_product_id) || !$stmts['update_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
 					} elseif ($stmts['update_product']->affected_rows > 0) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
@@ -806,17 +808,16 @@ function getMimeType($file) {
 function getPreparedStatements($dbc, array $options = array()) {
 	$prefix = (empty(TABLE_PREFIX) ? '' : TABLE_PREFIX) . 'CubeCart';
 	$stmts = array();
-	// Dry-run queries perform SELECT only
-	if ($options['dry_run'] || $options['disable_only']) {
-		$q = "SELECT 1 FROM `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer WHERE i.product_code=? AND mf.name=? LIMIT 1";
-		$stmts['select_product'] = $dbc->prepare($q);
-	} else {
+	// Select product ID
+	$q = "SELECT i.product_id FROM `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer WHERE i.product_code=? AND mf.name=? LIMIT 1";
+	$stmts['select_product'] = $dbc->prepare($q);
+	if (!$options['dry_run'] && !$options['disable_only']) {
 		// update prices for matching products
-		// params = 'dddsss', price, cost_price, sale price, upc, product code, manufacturer
-		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=?, i.upc=" . ($options['upc_update'] && $options['upc_overwrite'] ? '?' : "COALESCE(IF(i.upc='', NULL, i.upc), ?)") . " WHERE i.product_code=? AND mf.name=?";
+		// params = 'dddsi', price, cost_price, sale price, upc, product id
+		$q = "UPDATE `$prefix" . "_inventory` i SET " . ($options['enable_updated'] ? ' i.status=1, ' : '') . "i.price=?, i.cost_price=COALESCE(?, i.cost_price), i.sale_price=?, i.upc=" . ($options['upc_update'] && $options['upc_overwrite'] ? '?' : "COALESCE(IF(i.upc='', NULL, i.upc), ?)") . " WHERE i.product_id=?";
 		$stmts['update_product'] = $dbc->prepare($q);
 		
-		// update prices for matching option matrix entries
+		// update prices for matching option matrix entries (doesn't use product_id as that may not have been found)
 		// params = 'ddsss', price, sale price, upc, product code, manufacturer
 		if ($options['update_matrix']) {
 			$q = "UPDATE `$prefix" . "_option_matrix` m JOIN `$prefix" . "_inventory` i ON i.product_id=m.product_id JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET " . ($options['enable_updated'] ? ' m.set_enabled=1, ' : '') . "m.price=?, m.sale_price=?, m.upc=" . ($options['upc_update'] && $options['upc_overwrite'] ? '?' : "COALESCE(IF(m.upc='', NULL, m.upc), ?)") . " WHERE m.product_code=? AND mf.name=?";
