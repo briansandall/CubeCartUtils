@@ -678,7 +678,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			}
 			// disable / warn for any that were not found on the price list
 			$codes = fetch_assoc_stmt($stmts['select_product_codes']);
-			$diff = array_diff($codes, $product_codes);
+			$diff = array_diff((is_array($codes) ? $codes : array($codes)), $product_codes);
 			if ($options['disable_products']) {
 				if ($options['dry_run']) {
 					$result['disabled'][$product_id] = $diff;
