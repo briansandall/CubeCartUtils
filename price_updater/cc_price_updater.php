@@ -611,6 +611,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
 				}
 				$main_product_id = fetch_assoc_stmt($stmts['select_product']);
+				$product_id = false;
 				if ($select_only) {
 					if (is_int($main_product_id)) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
