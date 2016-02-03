@@ -323,11 +323,19 @@ $directories = getDirectories(PATH, true);
 		<?php if (isset($result) && is_array($result)) { ?>
 			<h3><?php echo (empty($options['dry_run']) ? 'UPDATED' : 'DRY RUN'); ?> RESULTS</h3>
 			<p>Completed <?php echo (empty($result['failed']) ? 'successfully' : 'with errors'); ?>.</p>
-			<h4>Updated: <?php echo count($result['updated']); ?><span class="toggle_link">[<a id="updated-toggle" href="#updated-toggle" onclick="toggle('updated')">Show</a>]</span></h4>
+			<h4>Updated Prices: <?php echo count($result['updated']); ?><span class="toggle_link">[<a id="updated-toggle" href="#updated-toggle" onclick="toggle('updated')">Show</a>]</span></h4>
 			<div class="toggle" id="updated">
 				<div class="light-border">
 					<?php foreach ($result['updated'] as $updated) { ?>
 						<?php echo '<p>' . htmlspecialchars($updated) . '</p>'; ?>
+					<?php } ?>
+				</div>
+			</div>
+			<h4>Updated Modification Date: <?php echo count($result['modified']); ?><span class="toggle_link">[<a id="modified-toggle" href="#modified-toggle" onclick="toggle('modified')">Show</a>]</span></h4>
+			<div class="toggle" id="modified">
+				<div class="light-border">
+					<?php foreach ($result['modified'] as $modified) { ?>
+						<?php echo '<p>' . htmlspecialchars($modified) . '</p>'; ?>
 					<?php } ?>
 				</div>
 			</div>
@@ -579,7 +587,7 @@ function treeToHtml(array $branch, $link = '', $subnodes = -1, $current = 1, $fi
  * @param $options  array of options; see declaration for details
  */
 function updatePrices($dbc, $filename, array $options = array()) {
-	$result = array('updated'=>array(), 'failed'=>array(), 'not_found'=>array(), 'warning'=>array(), 'disabled'=>array());
+	$result = array('updated'=>array(), 'failed'=>array(), 'not_found'=>array(), 'warning'=>array(), 'disabled'=>array(), 'modified'=>array());
 	$updated = array(); // store product_id => array of product codes matched for it
 	$stmts = getPreparedStatements($dbc, $options);
 	$labels = $options['header_labels'];
@@ -658,13 +666,13 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				}
 				// Product was found and updated - update 'date updated' field
 				$id = ($main_product_id ? $main_product_id : $product_id);
-				if ($id && empty($result['updated']["Date-$id"]) && ($options['update_date_all'] || ($changed && $options['update_date']))) {
+				if ($id && empty($result['modified'][$id]) && ($options['update_date_all'] || ($changed && $options['update_date']))) {
 					if ($select_only) {
-						$result['updated']["Date-$id"] = "Product id $id: Date modified updated for $manufacturer product $product_code";
+						$result['modified'][$id] = "Date modified updated for product id $id: triggered by $manufacturer product $product_code";
 					} elseif (!$stmts['update_date']->bind_param('i', $id) || !$stmts['update_date']->execute()) {
 						throw new \RuntimeException("Update date query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_date']->errno} - {$stmts['update_date']->error}");
 					} else {
-						$result['updated']["Date-$id"] = "Product id $id: Date modified updated for $manufacturer product $product_code";
+						$result['modified'][$id] = "Date modified updated for product id $id: triggered by $manufacturer product $product_code";
 					}
 				}
 			}
