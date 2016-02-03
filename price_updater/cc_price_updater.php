@@ -657,13 +657,14 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					}
 				}
 				// Product was found and updated - update 'date updated' field
-				if ($options['update_date_all'] || ($changed && $options['update_date'])) {
+				$id = ($main_product_id ? $main_product_id : $product_id);
+				if ($id && empty($result['updated']["Date-$id"]) && ($options['update_date_all'] || ($changed && $options['update_date']))) {
 					if ($select_only) {
-						$result['updated'][] = "Date modified updated for $manufacturer product $product_code";
-					} elseif (!$stmts['update_date']->bind_param('ss', $product_code, $manufacturer) || !$stmts['update_date']->execute()) {
+						$result['updated']["Date-$id"] = "Product id $id: Date modified updated for $manufacturer product $product_code";
+					} elseif (!$stmts['update_date']->bind_param('i', $id) || !$stmts['update_date']->execute()) {
 						throw new \RuntimeException("Update date query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_date']->errno} - {$stmts['update_date']->error}");
 					} else {
-						$result['updated'][] = "Date modified updated for $manufacturer product $product_code";
+						$result['updated']["Date-$id"] = "Product id $id: Date modified updated for $manufacturer product $product_code";
 					}
 				}
 			}
@@ -845,9 +846,9 @@ function getPreparedStatements($dbc, array $options = array()) {
 		}
 	}
 	// update product entry's modification date
-	// params = 'ss', product code, manufacturer
+	// params = 'i', product id
 	if ($options['update_date'] || $options['update_date_all']) {
-		$q = "UPDATE `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer SET i.updated=CURRENT_TIMESTAMP WHERE i.product_code=? AND mf.name=?";
+		$q = "UPDATE `$prefix" . "_inventory` i SET i.updated=CURRENT_TIMESTAMP WHERE i.product_id=?";
 		$stmts['update_date'] = $dbc->prepare($q);
 	}
 	//=== Statements for updating 'enabled' status of products and, if supported, matrix entries ===//
