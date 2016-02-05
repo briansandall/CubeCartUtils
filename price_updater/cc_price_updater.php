@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if (mysqli_connect_errno()) {
 			die("Could not connect to MySQL: " . mysqli_connect_error());
 		}
-		$result = array('updated'=>array(), 'failed'=>array(), 'not_found'=>array(), 'warning'=>array(), 'disabled'=>array());
+		$result = array('updated'=>array(), 'failed'=>array(), 'not_found'=>array(), 'warning'=>array(), 'disabled'=>array(), 'modified'=>array());
 		if (USE_TRANSACTIONS) {
 			$dbc->autocommit(false);
 			try {
