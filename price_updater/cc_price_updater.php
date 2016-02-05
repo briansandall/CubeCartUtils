@@ -322,7 +322,10 @@ $directories = getDirectories(PATH, true);
 		</form>
 		<?php if (isset($result) && is_array($result)) { ?>
 			<h3><?php echo (empty($options['dry_run']) ? 'UPDATED' : 'DRY RUN'); ?> RESULTS</h3>
-			<p>Completed <?php echo (empty($result['failed']) ? 'successfully' : 'with errors'); ?>.</p>
+			<p>Completed <?php echo (empty($result['error']) && empty($result['failed']) ? 'successfully' : 'with errors'); ?>.</p>
+			<?php if (!empty($result['error'])) { ?>
+				<p>FATAL ERROR - script aborted. Caused by: "<span class="error"><?php echo $result['error']; ?></span>"</p>
+			<?php } ?>
 			<h4>Updated Prices: <?php echo count($result['updated']); ?><span class="toggle_link">[<a id="updated-toggle" href="#updated-toggle" onclick="toggle('updated')">Show</a>]</span></h4>
 			<div class="toggle" id="updated">
 				<div class="light-border">
@@ -733,7 +736,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			}
 		}
 	} catch (\Exception $e) {
-		throw $e;
+		$result['error'] = $e->getMessage();
 	} finally {
 		foreach ($stmts as $stmt) { $stmt->close(); }
 	}
