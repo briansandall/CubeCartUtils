@@ -325,7 +325,7 @@ function init_tree() {
 function selectCategory(id) {
 	var input = document.getElementById('dir');
 	if (input) {
-		input.value = id;
+		input.value = decodeURIComponent(id);
 	}
 }
 
@@ -393,7 +393,7 @@ function getDirectories($dir, $show_files = false) {
 function treeToHtml(array $branch, $link = '', $subnodes = -1, $current = 1, $first = TRUE) {
 	$html = '<ul' . ($first ? ' id="navigable_tree" class="navigable_tree"' : '') . '>';
 	foreach ($branch AS $k => $v) {
-		$new_link = (empty($link) ? '' : "$link/") . urlencode($v['name']);
+		$new_link = (empty($link) ? '' : "$link/") . rawurlencode($v['name']);
 		if (empty($v['directories']) || ($subnodes > 0 && $current >= $subnodes)) {
 			$html .= '<li class="leaf" id="leaf-' . $new_link . '"><a id="' . $new_link . '" href="#' . $new_link . '">' . htmlspecialchars($v['name']) . '</a></li>';
 		} else {
