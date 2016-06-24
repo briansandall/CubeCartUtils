@@ -543,7 +543,7 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 	if (!$add_product && !$add_product_matrix && !$update_matrix) {
 		return false;
 	}
-	$code = substr_replace($file, '', strpos($file, '.'));
+	$code = substr_replace($file, '', strrpos($file, '.'));
 	$added = 0;
 	// Find matching product / matrix entries
 	if ((empty($options['regexp']) && (!$stmts['find_products']->bind_param('issss', $file_id, $code, $code, $code, $code) || !$stmts['find_products']->execute())) ||
