@@ -562,8 +562,14 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 			if (!$product) {
 				$product = $match;
 			} elseif ($match['product_id'] != $product['product_id']) {
-				$message .= "<br>ERROR: At least two products matched the file <strong>$code</strong>:<br>Product ID: $product[product_id] - Product Code: $product[product_code]<br>Product ID: $match[product_id] - Product Code: $match[product_code]";
-				return false;
+				if ($product['product_code'] == $code && $match['product_code'] != $code && empty($options['add_product_matrix'])) {
+					// ignore matrix match
+				} elseif ($match['product_code'] == $code && $product['product_code'] != $code && empty($options['add_product_matrix'])) {
+					$product = $match; // use exact match instead of matrix match
+				} else {
+					$message .= "<br>ERROR: At least two products matched the file <strong>$code</strong>:<br>Product ID: $product[product_id] - Product Code: $product[product_code]<br>Product ID: $match[product_id] - Product Code: $match[product_code]";
+					return false;
+				}
 			}
 		}
 	}
