@@ -68,10 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$errors['dir'] = '* Invalid directory or file';
 	}
 	$code_suffix = filter_input(INPUT_POST, 'code_suffix');
-	if (!is_string($code_suffix) || $code_suffix === '_' || $code_suffix === '-') {
+	if (!is_string($code_suffix)) {
+		$errors['code_suffix'] = '* Please enter a valid string';
 		$code_suffix = '';
-	} elseif (!preg_match('/^[-_a-z0-9]*$/i', $code_suffix)) {
-		$errors['code_suffix'] = '* Valid characters are -, _, a-z, and 0-9';
+	} elseif (!preg_match('/^[\(\)\?\|\+-_a-z0-9]*$/i', $code_suffix)) {
+		$errors['code_suffix'] = '* Valid characters are -, _, a-z, 0-9, (, ), |, ?, and +';
 	}
 	$options = array(
 		/** true to perform a dry-run that doesn't change the database */
@@ -95,11 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		/** whether to allow multiple image variants for a single product */
 		'allow_variants'     => (filter_input(INPUT_POST, 'allow_variants') ? true : false),
 		/** custom naming convention, if any, used to match multiple image filenames to a single product */
-		'code_suffix'        => $code_suffix,
+		'code_suffix'        => (empty($code_suffix) ? '(-|_)+' : $code_suffix),
 		/** custom regexp used to match multiple products to a single image file */
 		'regexp'             => filter_input(INPUT_POST, 'regexp')
 	);
-	$show_advanced = !empty($code_suffix) || !empty($options['regexp']);
+	$show_advanced = !empty($code_suffix) || !empty($options['regexp']) || $options['allow_variants'];
 	$show_options = ($show_advanced || !empty($options['add_product']) || !empty($options['add_product_matrix']) || !empty($options['update_matrix']) || !empty($options['code_suffix']));
 	if (empty($errors)) {
 		$dbc = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
@@ -209,11 +210,12 @@ $directories = getDirectories(PATH, true);
 					<div <?php echo (empty($show_advanced) ? 'class="toggle" ' : ''); ?>id="advanced">
 						<div class="light-border"><div class="inner">
 							<h3>Image Variants</h3>
-							<p>Multiple image relationships can be created by naming your files e.g. 'code-1.jpg', 'code_2.gif', etc., using either a hyphen, underscore, or neither before a number.</p>
-							<p>You may optionally define your own variant naming convention, e.g. '-var' would match 'ABC123-var0', 'ABC123-var-1', and 'ABC123-var_2' to the product code 'ABC123', but would not match 'ABC1234' or 'ABC123-1'</p>
+							<p>Multiple image relationships can be created by naming your files e.g. 'code-1.jpg', 'code_2.gif', etc., using either a hyphen or underscore followed by a number.</p>
+							<p>You may optionally define your own variant naming convention, e.g. '-var' would match 'ABC123-var0', 'ABC123-var-1', and 'ABC123-var_2' to the product code 'ABC123', but would not match 'ABC1234' or 'ABC123-1'.</p>
+							<p>The default naming convention as described above is '(-|_)+' but should be refined if any product codes already match that pattern (e.g. if 'A-1' and 'A-2' are distinct products, then variants should be named e.g. 'A-1-var1' rather than 'A-1-1').</p>
 							<p>If the filename is an exact match for a matrix entry's product code, that will take precedence over adding the file as an additional image for the main product.</p>
 							<p>Note that this works best when the product(s) with all related options and matrix entries have already been added.</p>
-							<input type="checkbox" id="allow_variants" name="allow_variants"<?php echo (isset($options['allow_variants']) && !$options['allow_variants'] ? '' : ' checked="checked"'); ?> />
+							<input type="checkbox" id="allow_variants" name="allow_variants"<?php echo (empty($options['allow_variants']) ? '' : ' checked="checked"'); ?> />
 							<label for="allow_variants" class="fleft">Allow multiple image variants per product (as described above)</label>
 							<div class="clear"></div><br>
 							<label for="code_suffix"><strong>Naming Convention</strong></label>
@@ -585,12 +587,12 @@ function addImageRelationships($file, $file_id, array $stmts, array $options, &$
 		} elseif (empty($relations[$match['product_id']] = fetch_assoc_stmt($stmts['relation_exists']))) {
 			// No previous product:image relationship exists for this file
 			$product_match = ($match['product_code'] === $code);
-			if (!$product_match) {
+			if (!$product_match && !empty($options['allow_variants'])) {
 				if (empty($options['regexp'])) {
 					// Check if the image file could be considered a 'variant' image
-					$var_match = (empty($options['allow_variants']) ? '' : '(-|_)?[0-9]+');
-					$suffix = (empty($options['allow_variants']) || empty($options['code_suffix']) ? '' : $options['code_suffix']);
-					$regexp = "/^$match[product_code]" . (empty($suffix) ? '' : "$suffix$var_match") . "$/i";
+					$var_match = (empty($options['allow_variants']) ? '' : '[0-9]+');
+					$suffix = (empty($options['allow_variants']) ? '' : $options['code_suffix']);
+					$regexp = "/^$match[product_code]$suffix$var_match$/i";
 					$product_match = preg_match($regexp, $code);
 				} else {
 					// Match the product code against the regexp, completely ignoring the image file's name
@@ -735,8 +737,8 @@ function getPreparedStatements($dbc, array $options = array()) {
 	
 	// prepared statement to check for products and matrix entries with codes matching the filename
 	// params = 'issss', file_id, filename x 4 (x 3 if custom regexp supplied)
-	$var_match = (empty($options['allow_variants']) ? '' : '(-|_)?[0-9]+');
-	$suffix = (empty($options['allow_variants']) || empty($options['code_suffix']) ? '' : $options['code_suffix']);
+	$var_match = (empty($options['allow_variants']) ? '' : '[0-9]+');
+	$suffix = (empty($options['allow_variants']) ? '' : $options['code_suffix']);
 	$q = "SELECT 
 			product.product_id,
 			product.product_code,
@@ -751,7 +753,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 			AND (
 				# match product code: exact, code-var1, or user-defined regexp e.g. codeY(S|M|L)
 				matrix.product_code=? 
-				OR ? REGEXP CONCAT('^(', matrix.product_code, '" . (empty($suffix) ? ')' : "$suffix)$var_match") . "$')" . 
+				OR ? REGEXP CONCAT('^(', matrix.product_code, '" . "$suffix)$var_match\$')" . 
 				(empty($options['regexp'])
 					? ''
 					: " OR matrix.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'"
@@ -764,7 +766,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 				OR ( # Only try matching if there is not an exact match for this product code
 					matrix.matrix_id IS NULL AND 
 						(" . (empty($options['regexp']) 
-								? "? REGEXP CONCAT('^(', product.product_code, '" . (empty($suffix) ? ')' : "$suffix)$var_match") . "$')"
+								? "? REGEXP CONCAT('^(', product.product_code, '$suffix)$var_match\$')"
 								: "product.product_code REGEXP '{$dbc->escape_string($options['regexp'])}'"
 							) . "
 						)
