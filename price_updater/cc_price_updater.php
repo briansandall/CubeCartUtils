@@ -386,7 +386,7 @@ $directories = getDirectories(PATH, true);
 			<div class="toggle" id="warning">
 				<div class="light-border">
 					<p class="fright">[<a id="warnings-toggle_all" href="#warnings-toggle_all" onclick="toggleAll('warnings')">Show All</a>]</p>
-					<p>The following product codes exist in the database but were not found in the price list.<br>This may be caused by a simple mis-match in the product codes, e.g. 'ABC-1' vs. 'ABC1', or may be because the product code is actually missing.<br>Please double-check the following product codes, their prices, and that the products are still in production.</p>
+					<p>The following product codes exist in the database but were not found in the price list (or vice versa).<br>This may be caused by a simple mis-match in the product codes, e.g. 'ABC-1' vs. 'ABC1', or may be because the product code is actually missing.<br>Please double-check the following product codes, their prices, and that the products are still in production.</p>
 					<?php foreach ($result['warning'] as $product_id => $product_codes) { ?>
 						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="warnings-<?php echo $product_id; ?>-toggle" href="#warnings-<?php echo $product_id; ?>-toggle" onclick="toggle('warnings-<?php echo $product_id; ?>')">Show</a>]</span></legend>
 						<div class="toggle" id="warnings-<?php echo $product_id; ?>">
