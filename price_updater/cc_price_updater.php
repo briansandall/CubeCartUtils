@@ -605,8 +605,8 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				$list_price = round_up(getAmount($entry[$labels['list_price']['label']]), 2);
 				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up(getAmount($entry[$labels['cost_price']['label']]), 2) : null);
 				$sale_price = round_up(getAmount($entry[$labels['sale_price']['label']]), 2);
-				if ($sale_price > $list_price && $options['allow_upsell']) {
-					$list_price = $sale_price;
+				if ($sale_price >= $list_price) {
+					$list_price = ($options['allow_upsell'] ? $sale_price : $list_price);
 					$sale_price = null;
 				}
 				$changed = false; // flag indicating product (or matrix) prices changed
