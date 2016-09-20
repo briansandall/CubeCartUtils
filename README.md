@@ -7,13 +7,13 @@ Current scripts include:
 
 - Price Updater: Update prices for your entire store in 5 minutes or less
 
-DISCLAIMER
+## DISCLAIMER
 
 Each script is provided  "as is" without warranty of any kind, either express or implied,
 including without limitation any implied warranties of condition, uninterrupted use,
 merchantability, fitness for a particular purpose, or non-infringement.
 
-INSTALLATION
+## INSTALLATION
 
 Be sure to read any README file located in the script's directory for specific instructions.
 
@@ -26,11 +26,33 @@ Be sure to read any README file located in the script's directory for specific i
 	- Make sure JavaScript is enabled
 	- Usage instructions are on the page, read carefully and use the 'Dry-Run' button
 
-IMPORTANT SECURITY WARNING
+## IMPORTANT SECURITY WARNING
 
 There is no authentication mechanism built in to any of these scripts, so while it is on your web host, ANYONE can use it. As such, it is up to you to prevent unauthorized access.
 
-The following steps are recommended to help prevent unauthorized access:
+My recommendation for reasons of both security and store stability is to use the scripts on a local installation of your site, i.e. NOT live, and then upload the database changes to your live site once you've made sure everything is still working correctly.
+
+### Using the Scripts Locally
+
+During step 2 of installation, DO NOT upload the scripts to your live site; instead, place them in your local web site directory, e.g. C:\wamp\www\git\cubecart\utils\scripts_go_here.
+
+After using the scripts and making changes to your local database, export it and upload/import it to your live site; I use the following code in a .bat file to generate the SQL output needed to keep all of my product data in sync:
+
+    "C:\wamp\bin\mysql\mysql5.7.9\bin\mysqldump.exe" -uroot -p cubecart CubeCart_documents CubeCart_category CubeCart_category_index CubeCart_filemanager CubeCart_image_index CubeCart_inventory CubeCart_manufacturers CubeCart_option_assign CubeCart_option_group CubeCart_option_matrix CubeCart_option_value CubeCart_seo_urls > C:\wamp\www\cubecart\cc_update.sql
+
+You need to check to make sure the path to mysqldump.exe is correct and can change the output destination to whatever makes sense for you.
+
+That outputs an SQL file with all the code necessary to update your live database with changes made locally using any of these utility scripts.
+
+NOTE: If you are using a case-insensitive file system like Windows for your local test server, be sure to find and replace all instances of 'cubecart_' with 'CubeCart_' in the SQL output, as well as fixing your custom prefix if applicable.
+
+If you added images, be sure to also upload them to the live site.
+
+To update your live store, simply run the SQL on your live store and you're all set!
+
+### Using the Scripts Live
+
+The following steps are recommended to help prevent unauthorized access **if you decide to upload the utility scripts to your live site**:
 
 - Place utility scripts in a sub directory of your web root, rather than the root folder
 
