@@ -26,6 +26,16 @@ Be sure to read any README file located in the script's directory for specific i
 	- Make sure JavaScript is enabled
 	- Usage instructions are on the page, read carefully and use the 'Dry-Run' button
 
+## PERFORMANCE
+
+### Price Updater
+
+On my local server (i.e. offline), the price updater script processes about 160 entries per second with matrix options enabled.
+
+It is therefore recommended to break price lists up to contain 10,000 or fewer entries each and run the script individually for each of these smaller files. Every such file will take approximately one minute to fully process.
+
+Keep in mind that the PHP.ini setting `max_execution_time` will typically limit the maximum number of entries per file to around 20,000.
+
 ## IMPORTANT SECURITY WARNING
 
 There is no authentication mechanism built in to any of these scripts, so while it is on your web host, ANYONE can use it. As such, it is up to you to prevent unauthorized access.
