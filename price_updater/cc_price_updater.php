@@ -207,7 +207,7 @@ $directories = getDirectories(PATH, true);
 		<h1>CubeCart Price Updater</h1>
 		<p>This script automatically updates your products' list and sale prices by reading a CSV-formatted text file.</p>
 		<p>If your store's database supports prices at the option matrix level, those may also be updated by checking the appropriate option.</p>
-		<h4>INSTRUCTIONS<span class="toggle_link">[<a id="instructions-toggle" href="#instructions-toggle" onclick="toggle('instructions')">Show</a>]</span></h4>
+		<h4>INSTRUCTIONS<span class="toggle_link">[<a id="instructions-toggle" href="#" onclick="return toggle('instructions');">Show</a>]</span></h4>
 		<div class="toggle" id="instructions">
 			<div class="light-border">
 				<ol>
@@ -326,7 +326,7 @@ $directories = getDirectories(PATH, true);
 			<?php if (!empty($result['error'])) { ?>
 				<p>FATAL ERROR - script aborted. Caused by: "<span class="error"><?php echo $result['error']; ?></span>"</p>
 			<?php } ?>
-			<h4>Updated Prices: <?php echo count($result['updated']); ?><span class="toggle_link">[<a id="updated-toggle" href="#updated-toggle" onclick="toggle('updated')">Show</a>]</span></h4>
+			<h4>Updated Prices: <?php echo count($result['updated']); ?><span class="toggle_link">[<a id="updated-toggle" href="#" onclick="return toggle('updated');">Show</a>]</span></h4>
 			<div class="toggle" id="updated">
 				<div class="light-border">
 					<?php foreach ($result['updated'] as $updated) { ?>
@@ -334,7 +334,7 @@ $directories = getDirectories(PATH, true);
 					<?php } ?>
 				</div>
 			</div>
-			<h4>Updated Modification Date: <?php echo count($result['modified']); ?><span class="toggle_link">[<a id="modified-toggle" href="#modified-toggle" onclick="toggle('modified')">Show</a>]</span></h4>
+			<h4>Updated Modification Date: <?php echo count($result['modified']); ?><span class="toggle_link">[<a id="modified-toggle" href="#" onclick="return toggle('modified');">Show</a>]</span></h4>
 			<div class="toggle" id="modified">
 				<div class="light-border">
 					<?php foreach ($result['modified'] as $modified) { ?>
@@ -342,10 +342,10 @@ $directories = getDirectories(PATH, true);
 					<?php } ?>
 				</div>
 			</div>
-			<h4>Disabled: <?php echo count($result['disabled']); ?><span class="toggle_link">[<a id="disabled-toggle" href="#disabled-toggle" onclick="toggle('disabled')">Show</a>]</span></h4>
+			<h4>Disabled: <?php echo count($result['disabled']); ?><span class="toggle_link">[<a id="disabled-toggle" href="#" onclick="return toggle('disabled');">Show</a>]</span></h4>
 			<div class="toggle" id="disabled">
 				<div class="light-border">
-					<p class="fright">[<a id="disabled_codes-toggle_all" href="#disabled_codes-toggle_all" onclick="toggleAll('disabled_codes')">Show All</a>]</p>
+					<p class="fright">[<a id="disabled_codes-toggle_all" href="#" onclick="return toggleAll('disabled_codes');">Show All</a>]</p>
 					<p>The following product / matrix codes exist in the database but were not found in the price list.</p>
 					<?php if ($options['dry_run']) { ?>
 					<p>Each of the following entries may be disabled upon running the script for real, thereby preventing their purchase in your store.</p>
@@ -354,7 +354,7 @@ $directories = getDirectories(PATH, true);
 					<p>Each of the following entries <strong>has been disabled and may no longer be purchased</strong>.</p>
 					<?php } ?>
 					<?php foreach ($result['disabled'] as $product_id => $product_codes) { ?>
-						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="disabled_codes-<?php echo $product_id; ?>-toggle" href="#disabled_codes-<?php echo $product_id; ?>-toggle" onclick="toggle('disabled_codes-<?php echo $product_id; ?>')">Show</a>]</span></legend>
+						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="disabled_codes-<?php echo $product_id; ?>-toggle" href="#" onclick="return toggle('disabled_codes-<?php echo $product_id; ?>');">Show</a>]</span></legend>
 						<div class="toggle" id="disabled_codes-<?php echo $product_id; ?>">
 							<div class="light-border">
 								<div class="inner">
@@ -365,7 +365,7 @@ $directories = getDirectories(PATH, true);
 					<?php } ?>
 				</div>
 			</div>
-			<h4>Not Found: <?php echo count($result['not_found']); ?><span class="toggle_link">[<a id="not_found-toggle" href="#not_found-toggle" onclick="toggle('not_found')">Show</a>]</span></h4>
+			<h4>Not Found: <?php echo count($result['not_found']); ?><span class="toggle_link">[<a id="not_found-toggle" href="#" onclick="return toggle('not_found');">Show</a>]</span></h4>
 			<div class="toggle" id="not_found">
 				<div class="light-border">
 					<p>The following product / matrix codes were on the price list but could not be matched to a database entry.</p>
@@ -374,7 +374,7 @@ $directories = getDirectories(PATH, true);
 					<?php } ?>
 				</div>
 			</div>
-			<h4>Errors: <?php echo count($result['failed']); ?><span class="toggle_link">[<a id="failed-toggle" href="#failed-toggle" onclick="toggle('failed')">Show</a>]</span></h4>
+			<h4>Errors: <?php echo count($result['failed']); ?><span class="toggle_link">[<a id="failed-toggle" href="#" onclick="return toggle('failed');">Show</a>]</span></h4>
 			<div class="toggle" id="failed">
 				<div class="light-border">
 					<?php foreach ($result['failed'] as $failed) { ?>
@@ -382,13 +382,13 @@ $directories = getDirectories(PATH, true);
 					<?php } ?>
 				</div>
 			</div>
-			<h4>Warnings: <?php echo count($result['warning']); ?><span class="toggle_link">[<a id="warning-toggle" href="#warning-toggle" onclick="toggle('warning')">Show</a>]</span></h4>
+			<h4>Warnings: <?php echo count($result['warning']); ?><span class="toggle_link">[<a id="warning-toggle" href="#" onclick="return toggle('warning');">Show</a>]</span></h4>
 			<div class="toggle" id="warning">
 				<div class="light-border">
-					<p class="fright">[<a id="warnings-toggle_all" href="#warnings-toggle_all" onclick="toggleAll('warnings')">Show All</a>]</p>
+					<p class="fright">[<a id="warnings-toggle_all" href="#" onclick="return toggleAll('warnings');">Show All</a>]</p>
 					<p>The following product codes exist in the database but were not found in the price list (or vice versa).<br>This may be caused by a simple mis-match in the product codes, e.g. 'ABC-1' vs. 'ABC1', or may be because the product code is actually missing.<br>Please double-check the following product codes, their prices, and that the products are still in production.</p>
 					<?php foreach ($result['warning'] as $product_id => $product_codes) { ?>
-						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="warnings-<?php echo $product_id; ?>-toggle" href="#warnings-<?php echo $product_id; ?>-toggle" onclick="toggle('warnings-<?php echo $product_id; ?>')">Show</a>]</span></legend>
+						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="warnings-<?php echo $product_id; ?>-toggle" href="#" onclick="return toggle('warnings-<?php echo $product_id; ?>');">Show</a>]</span></legend>
 						<div class="toggle" id="warnings-<?php echo $product_id; ?>">
 							<div class="light-border">
 								<div class="inner">
@@ -501,6 +501,7 @@ function toggle(id) {
 			}
 		}
 	}
+	return false;
 }
 
 function toggleAll(id) {
@@ -522,6 +523,7 @@ function toggleAll(id) {
 			}
 		}
 	}
+	return false;
 }
 
 window.addEventListener("load", init_tree);

@@ -180,7 +180,7 @@ $directories = getDirectories(PATH, true);
 			<input type="checkbox" id="update_size" name="update_size"<?php echo (!empty($options['update_size']) ? ' checked="checked"' : ''); ?> />
 			<label for="update_size" class="fleft">Update size of existing images (e.g. if it was resized after being added)</label>
 			<div class="clear"></div>
-			<h4>Options: Image Relationships [ <a id="options-toggle" href="#options-toggle" onclick="toggle('options')"><?php echo (empty($show_options) ? 'Show' : 'Hide'); ?></a> ]</h4>
+			<h4>Options: Image Relationships [ <a id="options-toggle" href="#" onclick="return toggle('options');"><?php echo (empty($show_options) ? 'Show' : 'Hide'); ?></a> ]</h4>
 			<div <?php echo (empty($show_options) ? 'class="toggle" ' : ''); ?>id="options">
 				<div class="light-border"><div class="inner">
 					<p>Options related to creating relationships between imported image files and existing products.</p>
@@ -206,7 +206,7 @@ $directories = getDirectories(PATH, true);
 					<input type="checkbox" id="ignore_existing" name="ignore_existing"<?php echo (isset($options['ignore_existing']) && !$options['ignore_existing'] ? '' : ' checked="checked"'); ?> />
 					<label for="ignore_existing" class="fleft">Add relationships for new files only</label>
 					<div class="clear"></div>
-					<h4>Advanced [ <a id="advanced-toggle" href="#advanced-toggle" onclick="toggle('advanced')"><?php echo (empty($show_advanced) ? 'Show' : 'Hide'); ?></a> ]</h4>
+					<h4>Advanced [ <a id="advanced-toggle" href="#" onclick="return toggle('advanced');"><?php echo (empty($show_advanced) ? 'Show' : 'Hide'); ?></a> ]</h4>
 					<div <?php echo (empty($show_advanced) ? 'class="toggle" ' : ''); ?>id="advanced">
 						<div class="light-border"><div class="inner">
 							<h3>Image Variants</h3>
@@ -347,6 +347,7 @@ function toggle(id) {
 			}
 		}
 	}
+	return false;
 }
 
 window.addEventListener("load", init_tree);
