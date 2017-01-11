@@ -743,8 +743,10 @@ function updatePrices($dbc, $filename, array $options = array()) {
 		foreach ($stmts as $stmt) { $stmt->close(); }
 	}
 	// Sort results by key
-	foreach ($result as &$array) {
-		ksort($array);
+	if (is_array($result)) {
+		foreach ($result as &$array) {
+			if (is_array($array)) { ksort($array); }
+		}
 	}
 	unset($array); // save puppies
 	return $result;
