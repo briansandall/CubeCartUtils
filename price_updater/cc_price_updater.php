@@ -386,13 +386,13 @@ $directories = getDirectories(PATH, true);
 			<div class="toggle" id="warning">
 				<div class="light-border">
 					<p class="fright">[<a id="warnings-toggle_all" href="#" onclick="return toggleAll('warnings');">Show All</a>]</p>
-					<p>The following product codes exist in the database but were not found in the price list (or vice versa).<br>This may be caused by a simple mis-match in the product codes, e.g. 'ABC-1' vs. 'ABC1', or may be because the product code is actually missing.<br>Please double-check the following product codes, their prices, and that the products are still in production.</p>
-					<?php foreach ($result['warning'] as $product_id => $product_codes) { ?>
-						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="warnings-<?php echo $product_id; ?>-toggle" href="#" onclick="return toggle('warnings-<?php echo $product_id; ?>');">Show</a>]</span></legend>
+					<p>Please review the following warnings carefully.</p>
+					<?php foreach ($result['warning'] as $product_id => $warnings) { ?>
+						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($warnings); ?> <span class="toggle_link">[<a id="warnings-<?php echo $product_id; ?>-toggle" href="#" onclick="return toggle('warnings-<?php echo $product_id; ?>');">Show</a>]</span></legend>
 						<div class="toggle" id="warnings-<?php echo $product_id; ?>">
 							<div class="light-border">
 								<div class="inner">
-									<p><?php echo (is_array($product_codes) ? nl2br(htmlspecialchars(implode("\n", $product_codes))) : htmlspecialchars($product_codes)); ?></p>
+									<p><?php echo (is_array($warnings) ? nl2br(htmlspecialchars(implode("\n", $warnings))) : htmlspecialchars($warnings)); ?></p>
 								</div>
 							</div>
 						</div>
@@ -623,101 +623,136 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
 				}
 				$main_product_id = fetch_assoc_stmt($stmts['select_product']);
-				$product_id = false;
 				if ($select_only) {
 					if (is_int($main_product_id)) {
+						// wasn't found as a matrix entry, but found as a product
+						if (array_key_exists($product_code, $result['not_found'])) {
+							unset($result['not_found'][$product_code]); 
+						}
 						if (empty($list_price)) {
 							$result['disabled'][$main_product_id][] = $product_code;
 						}  else {
 							$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 						}
 						$changed = true;
+					} elseif (!empty($main_product_id)) { // multiple matches
+						$result['failed'][] = "Failed to update product prices for $manufacturer - $product_code due to multiple matches [" . implode(', ', $main_product_id) . "]; please update their pricing manually.";
 					} elseif (!$options['ignore_missing']) {
-						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
+						$result['not_found'][$product_code] = "Product not found for $manufacturer - $product_code";
 					}
 					if ($options['update_matrix']) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
 						}
-						$product_id = fetch_assoc_stmt($stmts['select_matrix']);
-						if (!empty($product_id)) {
-							if (empty($list_price)) {
-								$result['disabled'][$product_id][] = $product_code;
+						$matrix_data = fetch_assoc_stmt($stmts['select_matrix'], true);
+						if (empty($matrix_data)) {
+							if ($options['ignore_missing']) {
+								// do nothing
+							} elseif (array_key_exists($product_code, $result['not_found'])) {
+								$result['not_found'][$product_code] = "Neither product nor matrix entry was found for $manufacturer - $product_code";
 							} else {
-								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
-								$changed = true;
-								$updated[$product_id][] = $product_code;
+								$result['not_found'][$product_code] = "Matrix entry not found for $manufacturer - $product_code";
 							}
+						} elseif (count($matrix_data) > 1) { // multiple matches
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code due to multiple matches [" . implode(', ', array_column($matrix_data, 'product_id')) . "]; please update their pricing manually.";
+						} elseif (!empty($matrix_data[0]['alt_id'])) {
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code because its product id ({$matrix_data[0]['product_id']}) differs from a product ({$matrix_data[0]['alt_id']}) with the same code; please update their pricing manually";
+						} elseif (is_int($main_product_id) && $main_product_id !== $matrix_data[0]['product_id']) {
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code because its product id ({$matrix_data[0]['product_id']}) differs from a product ($main_product_id) with the same code; please update their pricing manually";
+						} else {
 							// wasn't found as a product, but found as a matrix entry
 							if (array_key_exists($product_code, $result['not_found'])) {
 								unset($result['not_found'][$product_code]); 
 							}
-						} elseif (array_key_exists($product_code, $result['not_found'])) {
-							$result['not_found'][$product_code] = "Neither product nor matrix entry not found; Manufacturer: $manufacturer | Product Code: $product_code";
+							if (empty($list_price)) {
+								$result['disabled'][$matrix_data[0]['product_id']][] = $product_code;
+							} else {
+								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+								$changed = true;
+								$updated[$matrix_data[0]['product_id']][] = $product_code;
+							}
 						}
 					}
 				} else {
 					if (!is_int($main_product_id)) {
-						if (!$options['ignore_missing']) {
-							$result['not_found'][$product_code] = "Product was not found - Manufacturer: $manufacturer | Product Code: $product_code";
+						if (!empty($main_product_id)) { // multiple matches
+							$result['failed'][] = "Failed to update product prices for $manufacturer - $product_code due to multiple matches [" . implode(', ', $main_product_id) . "]; please update their pricing manually.";
+						} elseif (!$options['ignore_missing']) {
+							$result['not_found'][$product_code] = "Product not found in database - Manufacturer: $manufacturer | Product Code: $product_code";
 						}
-					} elseif (empty($list_price)) {
-						if ($options['disable_products']) {
-							if (!$stmts['disable_product']->bind_param('i', $main_product_id) || !$stmts['disable_product']->execute()) {
-								throw new \RuntimeException("Failed to disable product $main_product_id - $product_code: {$stmts['disable_product']->errno} - {$stmts['disable_product']->error}");
-							} elseif ($stmts['disable_product']->affected_rows > 0) {
-								$result['disabled'][$main_product_id][] = $product_code;
-							} else {
-								// either already disabled or not found - ignore
-							}
-						} else {
-							$result['warning'][$main_product_id][] = "$product_code did not have valid pricing information in the price list; prices were not updated and the product was not disabled.";
+					} else {
+						// wasn't found as a matrix entry, but found as a product
+						if (array_key_exists($product_code, $result['not_found'])) {
+							unset($result['not_found'][$product_code]); 
 						}
-					} elseif (!$stmts['update_product']->bind_param('dddsi', $list_price, $cost_price, $sale_price, $upc, $main_product_id) || !$stmts['update_product']->execute()) {
-						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
-					} elseif ($stmts['update_product']->affected_rows > 0) {
-						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
-						$changed = true;
-					}
-					if ($options['update_matrix']) {
 						if (empty($list_price)) {
-							// Disable matrix entry with invalid list price
-							if ($options['disable_matrix']) {
-								if (!$stmts['disable_matrix']->bind_param('is', $main_product_id, $product_code) || !$stmts['disable_matrix']->execute()) {
-									throw new \RuntimeException("Failed to disable matrix entry for product $main_product_id - $product_code: {$stmts['disable_matrix']->errno} - {$stmts['disable_matrix']->error}");
-								} elseif ($stmts['disable_matrix']->affected_rows > 0) {
+							if ($options['disable_products']) {
+								if (!$stmts['disable_product']->bind_param('i', $main_product_id) || !$stmts['disable_product']->execute()) {
+									throw new \RuntimeException("Failed to disable product $main_product_id - $product_code: {$stmts['disable_product']->errno} - {$stmts['disable_product']->error}");
+								} elseif ($stmts['disable_product']->affected_rows > 0) {
 									$result['disabled'][$main_product_id][] = $product_code;
 								} else {
 									// either already disabled or not found - ignore
 								}
 							} else {
-								$result['warning'][$main_product_id][] = "Matrix code $product_code did not have valid pricing information in the price list; prices were not updated and the matrix entry was not disabled.";
+								$result['warning'][$main_product_id][] = "$product_code did not have valid pricing information in the price list; prices were not updated and the product was not disabled.";
 							}
-						} elseif (!$stmts['update_matrix']->bind_param('ddsss', $list_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
-							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
-						} elseif ($stmts['update_matrix']->affected_rows > 0) {
-							if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
-								throw new \RuntimeException("Query to select product id from matrix table failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
-							}
-							$product_id = fetch_assoc_stmt($stmts['select_matrix']);
-							if (empty($product_id)) {
-								$result['failed'][] = "Matrix entry not found after updating! Manufacturer: $manufacturer | Product Code: $product_code";
+						} elseif (!$stmts['update_product']->bind_param('dddsi', $list_price, $cost_price, $sale_price, $upc, $main_product_id) || !$stmts['update_product']->execute()) {
+							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
+						} elseif ($stmts['update_product']->affected_rows > 0) {
+							$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+							$changed = true;
+						}
+					}
+					if ($options['update_matrix']) {
+						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
+							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
+						}
+						$matrix_data = fetch_assoc_stmt($stmts['select_matrix'], true);
+						if (empty($matrix_data)) {
+							if ($options['ignore_missing']) {
+								// do nothing
+							} elseif (array_key_exists($product_code, $result['not_found'])) {
+								$result['not_found'][$product_code] = "Neither product nor matrix entry was found for $manufacturer - $product_code";
 							} else {
+								$result['not_found'][$product_code] = "Matrix entry not found for $manufacturer - $product_code";
+							}
+						} elseif (count($matrix_data) > 1) { // multiple matches
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code due to multiple matches [" . implode(', ', array_column($matrix_data, 'product_id')) . "]; please update their pricing manually.";
+						} elseif (!empty($matrix_data[0]['alt_id'])) {
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code because its product id ({$matrix_data[0]['product_id']}) differs from a product ({$matrix_data[0]['alt_id']}) with the same code; please update their pricing manually";
+						} elseif (is_int($main_product_id) && $main_product_id !== $matrix_data[0]['product_id']) {
+							$result['failed'][] = "Failed to update matrix prices for $manufacturer - $product_code because its product id ({$matrix_data[0]['product_id']}) differs from a product ($main_product_id) with the same code; please update their pricing manually";
+						} else {
+							// wasn't found as a product, but found as a matrix entry
+							if (array_key_exists($product_code, $result['not_found'])) {
+								unset($result['not_found'][$product_code]); 
+							}
+							if (empty($list_price)) {
+								// Disable matrix entry with invalid list price
+								if ($options['disable_matrix']) {
+									if (!$stmts['disable_matrix']->bind_param('is', $matrix_data[0]['product_id'], $product_code) || !$stmts['disable_matrix']->execute()) {
+									throw new \RuntimeException("Failed to disable matrix entry for product {$matrix_data[0]['product_id']} - $product_code: {$stmts['disable_matrix']->errno} - {$stmts['disable_matrix']->error}");
+									} elseif ($stmts['disable_matrix']->affected_rows > 0) {
+										$result['disabled'][$matrix_data[0]['product_id']][] = $product_code;
+									} else {
+										// either already disabled or not found - ignore
+									}
+								} else {
+									$result['warning'][$matrix_data[0]['product_id']][] = "Matrix code $product_code did not have valid pricing information in the price list; prices were not updated and the matrix entry was not disabled.";
+								}
+							} elseif (!$stmts['update_matrix']->bind_param('ddsss', $list_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
+								throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
+							} elseif ($stmts['update_matrix']->affected_rows > 0) {
 								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 								$changed = true;
-								$updated[$product_id][] = $product_code;
-								// wasn't found as a product, but found as a matrix entry
-								if (array_key_exists($product_code, $result['not_found'])) {
-									unset($result['not_found'][$product_code]); 
-								}
+								$updated[$matrix_data[0]['product_id']][] = $product_code;
 							}
-						} elseif (array_key_exists($product_code, $result['not_found'])) {
-							$result['not_found'][$product_code] = "Neither product nor matrix entry was found or updated; Manufacturer: $manufacturer | Product Code: $product_code";
 						}
 					}
 				}
 				// Product was found and updated - update 'date updated' field
-				$id = ($main_product_id ? $main_product_id : $product_id);
+				$id = (is_int($main_product_id) ? $main_product_id : (isset($matrix_data[0]['product_id']) ? $matrix_data[0]['product_id'] : false));
 				if ($id && empty($result['modified'][$id]) && ($options['update_date_all'] || ($changed && $options['update_date']))) {
 					if ($select_only) {
 						$result['modified'][$id] = "Date modified updated for product id $id: triggered by $manufacturer product $product_code";
@@ -781,7 +816,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					} elseif ($stmts['update_main_price']->affected_rows > 0) {
 						$result['updated'][] = "Main prices for product id $product_id set to lowest found in matrix: List Price=\$$price, Sale Price=\$".($sale_price ? $sale_price : '0.00');
 					} else {
-						$result['warning'][$product_id][] = "Failed to update prices to \$$price (sale: \$".($sale_price ? $sale_price : '0.00').") - prices may already be up-to-date";
+						// prices already up to date - ignore
 					}
 				}
 			}
@@ -880,7 +915,7 @@ function getPreparedStatements($dbc, array $options = array()) {
 	$prefix = (empty(TABLE_PREFIX) ? '' : TABLE_PREFIX) . 'CubeCart';
 	$stmts = array();
 	// Select product ID
-	$q = "SELECT i.product_id FROM `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer WHERE i.product_code=? AND mf.name=? LIMIT 1";
+	$q = "SELECT i.product_id FROM `$prefix" . "_inventory` i JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer WHERE i.product_code=? AND mf.name=?";
 	$stmts['select_product'] = $dbc->prepare($q);
 	if (!$options['dry_run'] && !$options['disable_only']) {
 		// update prices for matching products
@@ -897,7 +932,11 @@ function getPreparedStatements($dbc, array $options = array()) {
 	}
 	// Queries used both in dry-run and actual processing
 	if ($options['update_matrix']) {
-		$q = "SELECT m.product_id FROM `$prefix" . "_option_matrix` m JOIN `$prefix" . "_inventory` i ON i.product_id=m.product_id JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer WHERE m.product_code=? AND mf.name=? LIMIT 1";
+		$q = "SELECT m.product_id FROM `$prefix" . "_option_matrix` m 
+			JOIN `$prefix" . "_inventory` i ON i.product_id=m.product_id 
+			JOIN `$prefix" . "_manufacturers` mf ON mf.id=i.manufacturer 
+			LEFT JOIN `$prefix" . "_inventory` i2 ON i2.product_id<>m.product_id AND i2.product_code=m.product_code AND i2.manufacturer=i.manufacturer 
+			WHERE m.product_code=? AND mf.name=?";
 		$stmts['select_matrix'] = $dbc->prepare($q);
 		
 		// Find all product codes for a product, including those from the option matrix
@@ -1006,5 +1045,5 @@ class CsvImporter
 		}
 		return $data;
 	}
-} 
+}
 ?>
