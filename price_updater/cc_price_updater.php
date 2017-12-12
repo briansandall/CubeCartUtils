@@ -737,7 +737,9 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			// disable / warn for any that were not found on the price list
 			$codes = fetch_assoc_stmt($stmts['select_product_codes']);
 			$diff = array_diff((is_array($codes) ? $codes : array($codes)), $product_codes);
-			if ($options['disable_matrix']) {
+			if (empty($diff)) {
+				// Nothing to do
+			} elseif ($options['disable_matrix']) {
 				if ($options['dry_run']) {
 					$result['disabled'][$product_id] = $diff;
 				} else {
@@ -757,10 +759,10 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					} elseif ($stmts['disable_matrix_product']->affected_rows > 0) {
 						$result['disabled'][$product_id][] = "Product $product_id disabled";
 					} else {
-						$result['warning'][$product_id][] = "Product $product_id could not be disabled: it may either not need to be or already is disabled; you should double-check";
+						$result['warning'][$product_id][] = "Product $product_id could not be disabled: it may already be disabled, but you should double-check";
 					}
 				}
-			} elseif (!empty($diff)) {
+			} else {
 				$result['warning'][$product_id] = $diff;
 			}
 			// Update main product price with the lowest (non-zero) of its enabled matrix options
