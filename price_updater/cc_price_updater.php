@@ -601,8 +601,11 @@ function updatePrices($dbc, $filename, array $options = array()) {
 		$select_only = ($options['dry_run'] || $options['disable_only']);
 		while ($data = $importer->get(2000)) {
 			foreach ($data as $entry) {
-				$manufacturer = trim(empty($entry[$labels['manufacturer']['label']]) ? $options['manufacturer'] : $entry[$labels['manufacturer']['label']]);
 				$product_code = trim($entry[$labels['product_code']['label']]);
+				if (empty($product_code)) {
+					continue; // nothing to do if no product code
+				}
+				$manufacturer = trim(empty($entry[$labels['manufacturer']['label']]) ? $options['manufacturer'] : $entry[$labels['manufacturer']['label']]);
 				$upc = (!$options['upc_update'] || empty($entry[$labels['upc']['label']]) ? null : $entry[$labels['upc']['label']]);
 				$list_price = round_up(getAmount($entry[$labels['list_price']['label']]), 2);
 				$cost_price = (isset($entry[$labels['cost_price']['label']]) ? round_up(getAmount($entry[$labels['cost_price']['label']]), 2) : null);
