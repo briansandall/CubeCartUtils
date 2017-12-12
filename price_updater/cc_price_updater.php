@@ -118,6 +118,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'disable_products'   => isset($_POST['disable_products']),
 		/** true to disable matrix codes that exist in the database but weren't found on the price list, or that had invalid pricing */
 		'disable_matrix'     => isset($_POST['disable_matrix']),
+		/** true to allow disabled products to be displayed (but not purchased) in the store catalog */
+		'remain_visible'     => isset($_POST['remain_visible']),
 		/** true to perform a dry run on price updates in order to check for and disable missing products */
 		'disable_only'       => isset($_POST['btn_disable']),
 		/** true to disable warnings for products found on the price list but not in the database */
@@ -286,6 +288,9 @@ $directories = getDirectories(PATH, true);
 			<div class="clear"></div><br>
 			<input type="checkbox" id="disable_products" name="disable_products"<?php echo (!empty($options['disable_products']) ? ' checked="checked"' : ''); ?> />
 			<label for="disable_products" class="fleft">Disable products found on the price list without valid pricing information</label>
+			<div class="clear"></div><br>
+			<input type="checkbox" id="remain_visible" name="remain_visible"<?php echo (isset($options['remain_visible']) && !$options['remain_visible'] ? '' : ' checked="checked"'); ?> />
+			<label for="remain_visible" class="fleft">Disabled products will remain visible (but not purchasable) in the store front</label>
 			<div class="clear"></div><br>
 			<input type="checkbox" id="ignore_missing" name="ignore_missing"<?php echo (!empty($options['ignore_missing']) ? ' checked="checked"' : ''); ?> />
 			<label for="ignore_missing" class="fleft">Ignore warnings for products found on the price list but not in the database</label>
@@ -961,18 +966,19 @@ function getPreparedStatements($dbc, array $options = array()) {
 		$stmts['update_date'] = $dbc->prepare($q);
 	}
 	//=== Statements for updating 'enabled' status of products and, if supported, matrix entries ===//
+	$status_column = ($options['remain_visible'] ? 'available' : 'status');
 	if ($options['disable_matrix']) {
 		// Disable matrix entries that weren't found in the price list; params = 'is', product id, matrix product code
 		$q = "UPDATE `$prefix" . "_option_matrix` SET `set_enabled`=0 WHERE product_id=? AND product_code=?";
 		$stmts['disable_matrix'] = $dbc->prepare($q);
 		// Disable a product whose code wasn't found in the price list, but only if it doesn't have any enabled matrix entries
 		// params = 'iii', product_id x 3
-		$q = "UPDATE `$prefix" . "_inventory` SET `status`=0, updated=CURRENT_TIMESTAMP WHERE product_id=? AND EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 LIMIT 1) AND NOT EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 AND m.set_enabled=1 LIMIT 1)";
+		$q = "UPDATE `$prefix" . "_inventory` SET `$status_column`='0', updated=CURRENT_TIMESTAMP WHERE product_id=? AND EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 LIMIT 1) AND NOT EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 AND m.set_enabled=1 LIMIT 1)";
 		$stmts['disable_matrix_product'] = $dbc->prepare($q);
 	}
 	if ($options['disable_products']) {
 		// Disables a product that was found on the price list but did not have valid pricing information
-		$q = "UPDATE `$prefix" . "_inventory` SET `status`=0, updated=CURRENT_TIMESTAMP WHERE product_id=?";
+		$q = "UPDATE `$prefix" . "_inventory` SET `$status_column`='0', updated=CURRENT_TIMESTAMP WHERE product_id=?";
 		$stmts['disable_product'] = $dbc->prepare($q);
 	}
 	return $stmts;
