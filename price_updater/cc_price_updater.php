@@ -114,8 +114,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'update_matrix'      => isset($_POST['update_matrix']),
 		/** update the main product price with the lowest non-zero matrix price */
 		'update_main_price'  => isset($_POST['update_main_price']),
-		/** true to disable product and matrix codes that exist in the database but weren't found on the price list */
+		/** true to disable product codes found on the price list with invalid pricing */
 		'disable_products'   => isset($_POST['disable_products']),
+		/** true to disable matrix codes that exist in the database but weren't found on the price list, or that had invalid pricing */
+		'disable_matrix'     => isset($_POST['disable_matrix']),
 		/** true to perform a dry run on price updates in order to check for and disable missing products */
 		'disable_only'       => isset($_POST['btn_disable']),
 		/** true to disable warnings for products found on the price list but not in the database */
@@ -126,7 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		'upc_overwrite'      => isset($_POST['upc_overwrite']),
 		// TODO option to save warnings to disk
 	);
-	if (!$options['update_matrix'] && ($options['update_main_price'] || $options['disable_products'])) {
+	if (!$options['update_matrix'] && ($options['update_main_price'] || $options['disable_matrix'])) {
 		$errors['matrix_options'] = 'You must check <strong>Update price entries in the option matrix</strong> in order to use any of the other Matrix Options.';
 	}
 	if ($options['update_matrix'] && !MATRIX_STATUS_ON) {
@@ -282,8 +284,11 @@ $directories = getDirectories(PATH, true);
 			<label for="allow_upsell" class="fleft">Allow 'sale' prices to be greater than the list price*</label>
 			<br><small>* If such is the case, the 'sale' price will be used as the list price, and the item will not be considered 'on sale'</small>
 			<div class="clear"></div><br>
+			<input type="checkbox" id="disable_products" name="disable_products"<?php echo (!empty($options['disable_products']) ? ' checked="checked"' : ''); ?> />
+			<label for="disable_products" class="fleft">Disable products found on the price list without valid pricing information</label>
+			<div class="clear"></div><br>
 			<input type="checkbox" id="ignore_missing" name="ignore_missing"<?php echo (!empty($options['ignore_missing']) ? ' checked="checked"' : ''); ?> />
-			<label for="ignore_missing" class="fleft">Disable warnings for products found on the price list but not in the database</label>
+			<label for="ignore_missing" class="fleft">Ignore warnings for products found on the price list but not in the database</label>
 			<div class="clear"></div><br>
 			<input type="checkbox" id="upc_update" name="upc_update"<?php echo (!empty($options['upc_update']) ? ' checked="checked"' : ''); ?> />
 			<label for="upc_update" class="fleft">Assign UPC codes if the price list contains that data (will not overwrite existing data)</label>
@@ -308,13 +313,13 @@ $directories = getDirectories(PATH, true);
 			<br><small class="inner">Note that pricing will only update if at least one of the product's prices (main product or matrix) changed.</small>
 			<br><small class="inner">Useful if there is no 'general' price for the product, i.e. pricing is determined entirely by the chosen options / matrix.</small>
 			<br><br>
-			<input type="checkbox" id="disable_products" name="disable_products"<?php echo (!empty($options['disable_products']) ? ' checked="checked"' : ''); ?><?php echo (MATRIX_STATUS_ON ? '' : ' disabled="disabled"'); ?> />
-			<label for="disable_products" class="fleft">Disable matrix entries with product codes not found on the price list, and possibly the parent product</label>
+			<input type="checkbox" id="disable_matrix" name="disable_matrix"<?php echo (!empty($options['disable_matrix']) ? ' checked="checked"' : ''); ?><?php echo (MATRIX_STATUS_ON ? '' : ' disabled="disabled"'); ?> />
+			<label for="disable_matrix" class="fleft">Disable matrix entries with either invalid pricing or product codes not found on the price list</label>
 			<button type="submit" name="btn_disable" class="fright" title="Did you do a Dry Run? Please do so first!" <?php echo (MATRIX_STATUS_ON ? '' : ' disabled="disabled"'); ?>>Disable Only</button>
 			<div class="clear"></div>
 			<small class="inner alert">Note that this also requires your CubeCart installation to support the 'set_enabled' setting for the `option_matrix` table.</small>
 			<br><small class="inner">Parent product is only disabled if all of its matrix options become disabled; products with no matrix options are not affected.</small>
-			<br><small class="inner">Click <strong>Disable Only</strong> to check for and disable missing product / matrix codes only - you should still perform a <strong>Dry Run</strong> first.</small>
+			<br><small class="inner">Click <strong>Disable Only</strong> to check for and disable missing matrix codes only - you should still perform a <strong>Dry Run</strong> first.</small>
 			<br><br>
 			<button type="submit" name="btn_dry" title="View results without changing the database">Dry-Run</button>
 			<button type="submit">Submit</button>
@@ -346,13 +351,8 @@ $directories = getDirectories(PATH, true);
 			<div class="toggle" id="disabled">
 				<div class="light-border">
 					<p class="fright">[<a id="disabled_codes-toggle_all" href="#" onclick="return toggleAll('disabled_codes');">Show All</a>]</p>
-					<p>The following product / matrix codes exist in the database but were not found in the price list.</p>
-					<?php if ($options['dry_run']) { ?>
-					<p>Each of the following entries may be disabled upon running the script for real, thereby preventing their purchase in your store.</p>
-					<p>Note that a product will only be disabled if it previously had one or more available matrix options and they were all disabled.</p>
-					<?php } else { ?>
-					<p>Each of the following entries <strong>has been disabled and may no longer be purchased</strong>.</p>
-					<?php } ?>
+					<p>The following product and/or matrix codes have been (or will be) disabled for one of the following reasons:</p>
+					<p>1. The price list did not contain a valid price for the entry<br>2. The matrix entry's product code was not found on the price list<br>3. A product had all of its matrix entries disabled due to point #2</p>
 					<?php foreach ($result['disabled'] as $product_id => $product_codes) { ?>
 						<legend>Total for product ID <?php echo htmlspecialchars($product_id); ?>: <?php echo count($product_codes); ?> <span class="toggle_link">[<a id="disabled_codes-<?php echo $product_id; ?>-toggle" href="#" onclick="return toggle('disabled_codes-<?php echo $product_id; ?>');">Show</a>]</span></legend>
 						<div class="toggle" id="disabled_codes-<?php echo $product_id; ?>">
@@ -611,6 +611,10 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					$list_price = ($options['allow_upsell'] ? $sale_price : $list_price);
 					$sale_price = null;
 				}
+				// Prevent prices getting set to 0.00
+				if ($list_price < 0.01) {
+					$list_price = null;
+				}
 				$changed = false; // flag indicating product (or matrix) prices changed
 				if (!$stmts['select_product']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_product']->execute()) {
 					throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_product']->errno} - {$stmts['select_product']->error}");
@@ -619,7 +623,11 @@ function updatePrices($dbc, $filename, array $options = array()) {
 				$product_id = false;
 				if ($select_only) {
 					if (is_int($main_product_id)) {
-						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						if (empty($list_price)) {
+							$result['disabled'][$main_product_id][] = $product_code;
+						}  else {
+							$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+						}
 						$changed = true;
 					} elseif (!$options['ignore_missing']) {
 						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
@@ -627,10 +635,16 @@ function updatePrices($dbc, $filename, array $options = array()) {
 					if ($options['update_matrix']) {
 						if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
-						} elseif (!empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
-							$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
-							$changed = true;
-							$updated[$product_id][] = $product_code;
+						}
+						$product_id = fetch_assoc_stmt($stmts['select_matrix']);
+						if (!empty($product_id)) {
+							if (empty($list_price)) {
+								$result['disabled'][$product_id][] = $product_code;
+							} else {
+								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
+								$changed = true;
+								$updated[$product_id][] = $product_code;
+							}
 							// wasn't found as a product, but found as a matrix entry
 							if (array_key_exists($product_code, $result['not_found'])) {
 								unset($result['not_found'][$product_code]); 
@@ -640,21 +654,50 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						}
 					}
 				} else {
-					if (!$stmts['update_product']->bind_param('dddsi', $list_price, $cost_price, $sale_price, $upc, $main_product_id) || !$stmts['update_product']->execute()) {
+					if (!is_int($main_product_id)) {
+						if (!$options['ignore_missing']) {
+							$result['not_found'][$product_code] = "Product was not found - Manufacturer: $manufacturer | Product Code: $product_code";
+						}
+					} elseif (empty($list_price)) {
+						if ($options['disable_products']) {
+							if (!$stmts['disable_product']->bind_param('i', $main_product_id) || !$stmts['disable_product']->execute()) {
+								throw new \RuntimeException("Failed to disable product $main_product_id - $product_code: {$stmts['disable_product']->errno} - {$stmts['disable_product']->error}");
+							} elseif ($stmts['disable_product']->affected_rows > 0) {
+								$result['disabled'][$main_product_id][] = $product_code;
+							} else {
+								// either already disabled or not found - ignore
+							}
+						} else {
+							$result['warning'][$main_product_id][] = "$product_code did not have valid pricing information in the price list; prices were not updated and the product was not disabled.";
+						}
+					} elseif (!$stmts['update_product']->bind_param('dddsi', $list_price, $cost_price, $sale_price, $upc, $main_product_id) || !$stmts['update_product']->execute()) {
 						throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_product']->errno} - {$stmts['update_product']->error}");
 					} elseif ($stmts['update_product']->affected_rows > 0) {
 						$result['updated'][] = "Product prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Cost Price: \$" . sprintf('%.2f', $cost_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
 						$changed = true;
-					} elseif (!$options['ignore_missing']) {
-						$result['not_found'][$product_code] = "Product was either not found or prices did not change; Manufacturer: $manufacturer | Product Code: $product_code";
 					}
 					if ($options['update_matrix']) {
-						if (!$stmts['update_matrix']->bind_param('ddsss', $list_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
+						if (empty($list_price)) {
+							// Disable matrix entry with invalid list price
+							if ($options['disable_matrix']) {
+								if (!$stmts['disable_matrix']->bind_param('is', $main_product_id, $product_code) || !$stmts['disable_matrix']->execute()) {
+									throw new \RuntimeException("Failed to disable matrix entry for product $main_product_id - $product_code: {$stmts['disable_matrix']->errno} - {$stmts['disable_matrix']->error}");
+								} elseif ($stmts['disable_matrix']->affected_rows > 0) {
+									$result['disabled'][$main_product_id][] = $product_code;
+								} else {
+									// either already disabled or not found - ignore
+								}
+							} else {
+								$result['warning'][$main_product_id][] = "Matrix code $product_code did not have valid pricing information in the price list; prices were not updated and the matrix entry was not disabled.";
+							}
+						} elseif (!$stmts['update_matrix']->bind_param('ddsss', $list_price, $sale_price, $upc, $product_code, $manufacturer) || !$stmts['update_matrix']->execute()) {
 							throw new \RuntimeException("Query failed for manufacturer $manufacturer and product code $product_code: {$stmts['update_matrix']->errno} - {$stmts['update_matrix']->error}");
 						} elseif ($stmts['update_matrix']->affected_rows > 0) {
 							if (!$stmts['select_matrix']->bind_param('ss', $product_code, $manufacturer) || !$stmts['select_matrix']->execute()) {
 								throw new \RuntimeException("Query to select product id from matrix table failed for manufacturer $manufacturer and product code $product_code: {$stmts['select_matrix']->errno} - {$stmts['select_matrix']->error}");
-							} elseif (empty($product_id = fetch_assoc_stmt($stmts['select_matrix']))) {
+							}
+							$product_id = fetch_assoc_stmt($stmts['select_matrix']);
+							if (empty($product_id)) {
 								$result['failed'][] = "Matrix entry not found after updating! Manufacturer: $manufacturer | Product Code: $product_code";
 							} else {
 								$result['updated'][] = "Matrix prices updated; Manufacturer: $manufacturer | Product Code: $product_code | List Price: \$" . sprintf('%.2f', $list_price) . " | Sale Price: \$" . sprintf('%.2f', $sale_price);
@@ -685,6 +728,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 		}
 		// TODO option to disable warnings (including display thereof)
 		// Array only contains entries when updating matrix codes, i.e. option_matrix table has been modified accordingly
+		// Products with invalid pricing were disabled above
 		foreach ($updated as $product_id => $product_codes) {
 			// select all product / matrix codes from database for this product
 			if (!$stmts['select_product_codes']->bind_param('ii', $product_id, $product_id) || !$stmts['select_product_codes']->execute()) {
@@ -693,7 +737,7 @@ function updatePrices($dbc, $filename, array $options = array()) {
 			// disable / warn for any that were not found on the price list
 			$codes = fetch_assoc_stmt($stmts['select_product_codes']);
 			$diff = array_diff((is_array($codes) ? $codes : array($codes)), $product_codes);
-			if ($options['disable_products']) {
+			if ($options['disable_matrix']) {
 				if ($options['dry_run']) {
 					$result['disabled'][$product_id] = $diff;
 				} else {
@@ -708,12 +752,12 @@ function updatePrices($dbc, $filename, array $options = array()) {
 						}
 					}
 					// Then disable products that no longer have any enabled matrix options
-					if (!$stmts['disable_product']->bind_param('iii', $product_id, $product_id, $product_id) || !$stmts['disable_product']->execute()) {
-						throw new \RuntimeException("Failed to disable product id $product_id: {$stmts['disable_product']->errno} - {$stmts['disable_product']->error}");
-					} elseif ($stmts['disable_product']->affected_rows > 0) {
+					if (!$stmts['disable_matrix_product']->bind_param('iii', $product_id, $product_id, $product_id) || !$stmts['disable_matrix_product']->execute()) {
+						throw new \RuntimeException("Failed to disable product id $product_id: {$stmts['disable_matrix_product']->errno} - {$stmts['disable_matrix_product']->error}");
+					} elseif ($stmts['disable_matrix_product']->affected_rows > 0) {
 						$result['disabled'][$product_id][] = "Product $product_id disabled";
 					} else {
-						$result['warning'][$product_id][] = "Product $product_id was not be disabled: it may either not need to be or already is disabled; you should double-check";
+						$result['warning'][$product_id][] = "Product $product_id could not be disabled: it may either not need to be or already is disabled; you should double-check";
 					}
 				}
 			} elseif (!empty($diff)) {
@@ -873,13 +917,18 @@ function getPreparedStatements($dbc, array $options = array()) {
 		$stmts['update_date'] = $dbc->prepare($q);
 	}
 	//=== Statements for updating 'enabled' status of products and, if supported, matrix entries ===//
-	if ($options['disable_products']) {
+	if ($options['disable_matrix']) {
 		// Disable matrix entries that weren't found in the price list; params = 'is', product id, matrix product code
 		$q = "UPDATE `$prefix" . "_option_matrix` SET `set_enabled`=0 WHERE product_id=? AND product_code=?";
 		$stmts['disable_matrix'] = $dbc->prepare($q);
 		// Disable a product whose code wasn't found in the price list, but only if it doesn't have any enabled matrix entries
 		// params = 'iii', product_id x 3
-		$q = "UPDATE `$prefix" . "_inventory` SET `status`=0, updated=CURRENT_TIMESTAMP WHERE product_id=? AND EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=?  AND m.status=1 LIMIT 1) AND NOT EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 AND m.set_enabled=1 LIMIT 1)";
+		$q = "UPDATE `$prefix" . "_inventory` SET `status`=0, updated=CURRENT_TIMESTAMP WHERE product_id=? AND EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 LIMIT 1) AND NOT EXISTS (SELECT 1 FROM `$prefix" . "_option_matrix` m WHERE m.product_id=? AND m.status=1 AND m.set_enabled=1 LIMIT 1)";
+		$stmts['disable_matrix_product'] = $dbc->prepare($q);
+	}
+	if ($options['disable_products']) {
+		// Disables a product that was found on the price list but did not have valid pricing information
+		$q = "UPDATE `$prefix" . "_inventory` SET `status`=0, updated=CURRENT_TIMESTAMP WHERE product_id=?";
 		$stmts['disable_product'] = $dbc->prepare($q);
 	}
 	return $stmts;
